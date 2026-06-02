@@ -69,6 +69,8 @@ async function directCall<T>(path: string, fields: Record<string, string>): Prom
   }
 }
 
+const isDev = import.meta.env.DEV;
+
 /** Use Edge Function in prod, direct call in dev */
 async function payboltPost<T>(path: string, fields: Record<string, string>, action: string, params: Record<string, unknown>): Promise<T> {
   if (!isDev && PAYBOLT_PROXY_URL) {
@@ -76,8 +78,6 @@ async function payboltPost<T>(path: string, fields: Record<string, string>, acti
   }
   return directCall<T>(path, fields);
 }
-
-const isDev = import.meta.env.DEV;
 
 export function isPaymentComplete(data: PayboltCheckStatusResponse): boolean {
   const top = String(data.status ?? '').toUpperCase();
