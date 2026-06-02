@@ -183,6 +183,13 @@ const C = {
   muted: '#6b7280',
 };
 
+/* ─── Helpers ──────────────────────────────────────────────────────────── */
+function formatTime(sec: number) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 /* ─── Active Trade Card ────────────────────────────────────────────────── */
 const TradeCard = ({ trade, currentPrice }: { trade: ActiveTrade; currentPrice: number }) => {
   const isUp = trade.type === 'UP';
