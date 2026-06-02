@@ -174,6 +174,15 @@ const LineChart = ({
   );
 };
 
+/* ─── Colors ────────────────────────────────────────────────────────────── */
+const C = {
+  bg: '#0f1118',
+  up: '#0bb783',
+  down: '#ff4d5c',
+  gold: '#f0b90b',
+  muted: '#6b7280',
+};
+
 /* ─── Active Trade Card ────────────────────────────────────────────────── */
 const TradeCard = ({ trade, currentPrice }: { trade: ActiveTrade; currentPrice: number }) => {
   const isUp = trade.type === 'UP';
