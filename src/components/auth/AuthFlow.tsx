@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { Mail, Lock, ArrowRight, Loader2, User } from 'lucide-react';
 import { registerUser, loginUser, updateDisplayName } from '../../services/authService';
-import { isSupabaseConfigured } from '../../lib/supabase';
 import type { UserProfile } from '../../types/profile';
 
 interface AuthFlowProps {
@@ -105,7 +104,7 @@ const AuthFlow: React.FC<AuthFlowProps> = ({ onComplete }) => {
     <div className="min-h-[100dvh] bg-[#0a0b0f] text-white flex flex-col items-center justify-center px-4 relative overflow-hidden font-space">
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-72 h-72 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="relative z-10 w-full max-w-[400px] space-y-6">
+        <div className="relative z-10 w-full max-w-[400px] space-y-6">
         <div className="flex flex-col items-center text-center gap-2">
           <img src="/logo/logo.png" alt="Tryonetrade" className="w-16 h-16 rounded-2xl object-cover shadow-lg" />
           <h1 className="text-2xl font-black tracking-tight">Tryonetrade</h1>
@@ -113,12 +112,6 @@ const AuthFlow: React.FC<AuthFlowProps> = ({ onComplete }) => {
             {mode === 'signup' ? 'Create your account' : 'Welcome back'}
           </p>
         </div>
-
-        {!isSupabaseConfigured && (
-          <p className="text-[10px] text-center text-[#ffb300] bg-[#ffb300]/10 border border-[#ffb300]/20 rounded-lg py-2 px-3">
-            Demo mode — add Supabase keys in .env for cloud sync
-          </p>
-        )}
 
         <div className="space-y-4">
           <div className="flex items-center gap-2 bg-[#161821] border border-white/10 rounded-xl px-4 py-3 focus-within:border-blue-500">

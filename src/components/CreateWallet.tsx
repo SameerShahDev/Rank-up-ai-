@@ -48,7 +48,6 @@ const CreateWallet: React.FC<CreateWalletProps> = ({ onWalletCreated }) => {
           Launch App →
         </button>
 
-        <p className="text-xs text-gray-600">Demo mode · No real funds</p>
       </div>
     </div>
   );
