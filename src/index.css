@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body {
+    @apply bg-[#0b0c10] text-white antialiased;
+    /* Prevent pull-to-refresh on mobile */
+    overscroll-behavior-y: none;
+    /* Remove blue tap highlight on mobile browsers */
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Disable text selection globally for app-like feel, except in inputs */
+  *:not(input):not(textarea) {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .glass-panel {
+    @apply bg-[#161821]/80 backdrop-blur-xl border border-white/5 shadow-2xl;
+  }
+}
