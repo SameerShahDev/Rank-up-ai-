@@ -127,12 +127,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async (event, session) => {
         console.log('[AuthContext] Auth state change:', event);
         if (event === 'SIGNED_IN' && session?.user) {
-          const { loadUserProfile } = await import('../services/authService');
-          const prof = await loadUserProfile();
-          if (prof) {
-            setProfile(prof);
-            setDemoBalance(prof.demoBalance);
-            setRealBalance(prof.realBalance);
+          try {
+            const { loadUserProfile } = await import('../services/authService');
+            const prof = await loadUserProfile();
+            if (prof) {
+              setProfile(prof);
+              setDemoBalance(prof.demoBalance);
+              setRealBalance(prof.realBalance);
+            } else {
+              const u = session.user;
+              setProfile({
+                profileId: u.id,
+                email: u.email ?? '',
+                displayName: (u.user_metadata?.display_name as string) ?? null,
+                demoBalance: 10000,
+                realBalance: 0,
+              });
+            }
+          } catch (e) {
+            console.warn('[AuthContext] Profile load error, using fallback:', e);
+            const u = session.user;
+            setProfile({
+              profileId: u.id,
+              email: u.email ?? '',
+              displayName: (u.user_metadata?.display_name as string) ?? null,
+              demoBalance: 10000,
+              realBalance: 0,
+            });
           }
           setIsLoading(false);
         } else if (event === 'SIGNED_OUT') {
