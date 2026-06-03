@@ -69,6 +69,16 @@ const LineChart = ({
     const toX = (i: number) => pad.left + (i / (history.length - 1)) * plotW;
     const toY = (v: number) => pad.top + plotH - ((v - min) / range) * plotH;
 
+    // Determine trend direction from recent prices
+    const recent = history.slice(-8);
+    const earlier = history.slice(-16, -8);
+    const trendUp = recent.length > 0 && earlier.length > 0
+      ? recent.reduce((a, b) => a + b, 0) / recent.length >= earlier.reduce((a, b) => a + b, 0) / earlier.length
+      : true;
+    const lineColor = trendUp ? C.up : C.down;
+    const gradA = trendUp ? 'rgba(11,183,131,' : 'rgba(255,77,92,';
+    const glowColor = trendUp ? 'rgba(11,183,131,0.15)' : 'rgba(255,77,92,0.15)';
+
     // Grid lines
     ctx.strokeStyle = 'rgba(255,255,255,0.04)';
     ctx.lineWidth = 1;
@@ -94,15 +104,15 @@ const LineChart = ({
     ctx.textAlign = 'center';
     const timeStep = Math.max(1, Math.floor(history.length / 4));
     for (let i = 0; i < history.length; i += timeStep) {
-      const d = new Date(Date.now() - (history.length - 1 - i) * 1500);
-      const t = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+      const d = new Date(Date.now() - (history.length - 1 - i) * 800);
+      const t = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`;
       ctx.fillText(t, toX(i), H - 4);
     }
 
-    // Gradient fill under line
+    // Gradient fill under line — dynamic color
     const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + plotH);
-    grad.addColorStop(0, 'rgba(11,183,131,0.15)');
-    grad.addColorStop(1, 'rgba(11,183,131,0.0)');
+    grad.addColorStop(0, `${gradA}0.15)`);
+    grad.addColorStop(1, `${gradA}0.0)`);
     ctx.beginPath();
     ctx.moveTo(toX(0), toY(history[0]));
     for (let i = 1; i < history.length; i++) {
@@ -114,32 +124,45 @@ const LineChart = ({
     ctx.fillStyle = grad;
     ctx.fill();
 
-    // Price line
+    // Glow effect behind line
+    ctx.save();
+    ctx.strokeStyle = glowColor;
+    ctx.lineWidth = 8;
+    ctx.lineJoin = 'round';
     ctx.beginPath();
     ctx.moveTo(toX(0), toY(history[0]));
     for (let i = 1; i < history.length; i++) {
       ctx.lineTo(toX(i), toY(history[i]));
     }
-    ctx.strokeStyle = C.up;
-    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+
+    // Price line — thicker, dynamic color
+    ctx.beginPath();
+    ctx.moveTo(toX(0), toY(history[0]));
+    for (let i = 1; i < history.length; i++) {
+      ctx.lineTo(toX(i), toY(history[i]));
+    }
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth = 2.5;
     ctx.lineJoin = 'round';
     ctx.stroke();
 
-    // Current price dot
+    // Current price dot with glow
     const lastX = toX(history.length - 1);
     const lastY = toY(history[history.length - 1]);
     ctx.beginPath();
-    ctx.arc(lastX, lastY, 4, 0, Math.PI * 2);
-    ctx.fillStyle = C.up;
+    ctx.arc(lastX, lastY, 6, 0, Math.PI * 2);
+    ctx.fillStyle = lineColor;
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(lastX, lastY, 7, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(11,183,131,0.3)';
+    ctx.arc(lastX, lastY, 10, 0, Math.PI * 2);
+    ctx.strokeStyle = lineColor + '40';
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Price label on axis
-    ctx.fillStyle = C.up;
+    // Price label on axis — dynamic color
+    ctx.fillStyle = lineColor;
     ctx.beginPath();
     ctx.roundRect(W - pad.right - 2, lastY - 10, pad.right + 2, 20, 3);
     ctx.fill();
@@ -254,24 +277,29 @@ const TradingDashboard: React.FC<{
   useEffect(() => { priceRef.current = price; }, [price]);
   useEffect(() => { setPrice(asset.basePrice); }, [asset]);
 
-  // Live price tick
+  // Live price tick — more volatile for realistic up/down feel
   useEffect(() => {
     let momentum = 0;
     let ticks = 0;
     const iv = setInterval(() => {
       setPrice(prev => {
         if (ticks <= 0) {
-          momentum = (Math.random() - 0.5) * prev * 0.0012;
-          ticks = 20 + Math.floor(Math.random() * 40);
+          momentum = (Math.random() - 0.5) * prev * 0.004;
+          ticks = 8 + Math.floor(Math.random() * 15);
         }
         ticks--;
-        const vol = prev * 0.0002;
+        const vol = prev * 0.0006;
         const noise = (Math.random() * vol * 2) - vol;
-        const drift = (asset.basePrice - prev) * 0.0005;
-        const next = prev + noise + momentum + drift;
+        const drift = (asset.basePrice - prev) * 0.0004;
+        let next = prev + noise + momentum + drift;
+        // Occasional sharp spike (1% chance per tick)
+        if (Math.random() < 0.008) {
+          const spike = (Math.random() > 0.5 ? 1 : -1) * next * (0.003 + Math.random() * 0.005);
+          next += spike;
+        }
         return next;
       });
-    }, 1500);
+    }, 800);
     return () => clearInterval(iv);
   }, [asset.basePrice]);
 

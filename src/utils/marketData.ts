@@ -67,7 +67,7 @@ function generateCandles(symbol: string, fromPrice: number, count: number, start
   const seed      = PRICE_SEEDS[symbol];
   const interval  = 4 * 60 * 60 * 1000; // 4H
   const priceRange = seed.hi - seed.lo;
-  const volatility = priceRange * 0.030; // 3% of range per 4H candle
+  const volatility = priceRange * 0.055; // 5.5% of range per 4H candle — more realistic up/down
 
   const candles: Candle[] = [];
   let price = fromPrice;
@@ -80,7 +80,7 @@ function generateCandles(symbol: string, fromPrice: number, count: number, start
     const change = (Math.random() - 0.48) * volatility + revert;
     const close  = Math.min(Math.max(open + change, seed.lo * 0.9), seed.hi * 1.1);
 
-    const wickFactor = 0.4 + Math.random() * 1.2;
+    const wickFactor = 0.6 + Math.random() * 2.0;
     const high = Math.max(open, close) + Math.abs(Math.random() * volatility * wickFactor);
     const low  = Math.min(open, close) - Math.abs(Math.random() * volatility * wickFactor);
     const volume = seed.start * (300 + Math.random() * 1200);
@@ -109,7 +109,7 @@ const _buffer: Record<string, Candle[]>  = {};
 const _headIdx: Record<string, number>   = {}; // current playback position in buffer
 const _liveCandle: Record<string, Candle> = {};
 const _tickCount: Record<string, number>  = {};
-const TICKS_PER_CANDLE = 6; // 6 × 600ms = 3.6 sec per candle → feels fast & live
+const TICKS_PER_CANDLE = 10; // 10 × 600ms = 6 sec per candle → smoother, more realistic movement
 
 // Init all markets
 MARKETS.forEach(m => {
@@ -175,8 +175,17 @@ export function tickPrices(): void {
 
     // Smoothly build live candle tick-by-tick toward nextCandle's close
     const progress = tc / TICKS_PER_CANDLE;
-    const noise    = (nextCandle.high - nextCandle.low) * (Math.random() - 0.5) * 0.25;
-    lc.close = lc.open + (nextCandle.close - lc.open) * Math.min(progress, 1) + noise;
+    const noise    = (nextCandle.high - nextCandle.low) * (Math.random() - 0.5) * 0.4;
+    let tickMove = lc.open + (nextCandle.close - lc.open) * Math.min(progress, 1) + noise;
+
+    // Occasional sharp spike (1.5% chance per tick)
+    if (Math.random() < 0.015) {
+      const spikeDir = Math.random() > 0.5 ? 1 : -1;
+      const spikeSize = nextCandle.close * (0.002 + Math.random() * 0.006);
+      tickMove += spikeDir * spikeSize;
+    }
+
+    lc.close = tickMove;
     lc.high  = Math.max(lc.high, lc.close);
     lc.low   = Math.min(lc.low,  lc.close);
 

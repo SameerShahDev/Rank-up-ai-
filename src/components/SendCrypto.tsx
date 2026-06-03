@@ -12,9 +12,13 @@ const TF_CANDLE_COUNT: Record<Timeframe, number> = {
 // ─── Candlestick Chart ───────────────────────────────────────────────────
 function CandlestickChart({ candles, livePrice }: { candles: Candle[]; livePrice: number }) {
   const svgRef = useRef<SVGSVGElement>(null);
-  const W = 340, H = 220, PAD = { top: 10, right: 8, bottom: 20, left: 50 };
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [crosshair, setCrosshair] = useState<{ x: number; y: number; price: number; time: string } | null>(null);
+
+  const W = 340, H = 290, PAD = { top: 10, right: 60, bottom: 30, left: 55 };
+  const VOL_H = 40; // volume section height
   const chartW = W - PAD.left - PAD.right;
-  const chartH = H - PAD.top - PAD.bottom;
+  const candleH = H - PAD.top - PAD.bottom - VOL_H - 4;
 
   if (!candles.length) return <div className="h-44 bg-gray-800 rounded-2xl animate-pulse" />;
 
@@ -23,9 +27,37 @@ function CandlestickChart({ candles, livePrice }: { candles: Candle[]; livePrice
   const maxP  = Math.max(...highs, livePrice);
   const minP  = Math.min(...lows,  livePrice);
   const range = maxP - minP || 1;
+  const volMax = Math.max(...candles.map(c => c.volume), 1);
 
-  const toY = (p: number) => PAD.top + ((maxP - p) / range) * chartH;
-  const barW = Math.max(2, (chartW / candles.length) - 1);
+  const toY = (p: number) => PAD.top + ((maxP - p) / range) * candleH;
+  const toVolY = (v: number) => PAD.top + candleH + 4 + VOL_H - (v / volMax) * VOL_H;
+  const barW = Math.max(2, (chartW / candles.length) - 0.5);
+
+  // Moving averages
+  const ma = (period: number) => {
+    const vals: (number | null)[] = [];
+    for (let i = 0; i < candles.length; i++) {
+      if (i < period - 1) { vals.push(null); continue; }
+      let sum = 0;
+      for (let j = i - period + 1; j <= i; j++) sum += candles[j].close;
+      vals.push(sum / period);
+    }
+    return vals;
+  };
+  const ma7 = ma(7);
+  const ma25 = ma(25);
+
+  // Build MA path data
+  const maPath = (vals: (number | null)[]) => {
+    let d = '';
+    for (let i = 0; i < vals.length; i++) {
+      if (vals[i] === null) continue;
+      const x = PAD.left + (i / (candles.length - 1)) * chartW;
+      const y = toY(vals[i]!);
+      d += (d ? 'L' : 'M') + x.toFixed(1) + ',' + y.toFixed(1);
+    }
+    return d;
+  };
 
   // Price labels
   const priceSteps = 4;
@@ -34,27 +66,73 @@ function CandlestickChart({ candles, livePrice }: { candles: Candle[]; livePrice
     return { y: toY(p), label: p >= 1000 ? `${(p / 1000).toFixed(1)}k` : p.toFixed(p < 10 ? 4 : 2) };
   });
 
+  // Crosshair handler
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const scaleX = W / rect.width;
+    const scaleY = H / rect.height;
+    const svgX = (e.clientX - rect.left) * scaleX;
+    const svgY = (e.clientY - rect.top) * scaleY;
+    if (svgX < PAD.left || svgX > W - PAD.right || svgY < PAD.top || svgY > PAD.top + candleH + VOL_H + 4) {
+      setCrosshair(null);
+      return;
+    }
+    const pct = (svgX - PAD.left) / chartW;
+    const idx = Math.round(pct * (candles.length - 1));
+    const c = candles[Math.min(idx, candles.length - 1)];
+    const priceAtX = maxP - ((svgY - PAD.top) / candleH) * range;
+    const d = new Date(c.time);
+    setCrosshair({
+      x: svgX,
+      y: svgY,
+      price: priceAtX,
+      time: `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`,
+    });
+  };
+  const handleMouseLeave = () => setCrosshair(null);
+
+  const fmtP = (p: number) => p >= 1000 ? p.toFixed(0) : p < 1 ? p.toFixed(4) : p.toFixed(2);
+
   return (
-    <div className="relative bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
-      {/* MA overlays */}
-      <div className="absolute top-2 left-2 flex space-x-2 text-xs z-10">
-        <span className="text-blue-400">MA7</span>
-        <span className="text-orange-400">MA25</span>
+    <div ref={containerRef} className="relative bg-gray-800/50 rounded-2xl border border-gray-700/50 overflow-hidden">
+      {/* MA legend */}
+      <div className="absolute top-2 left-2 flex gap-3 text-[10px] z-10 font-mono">
+        <span className="text-blue-400/80">MA7</span>
+        <span className="text-orange-400/80">MA25</span>
       </div>
-      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 220 }}>
+      {/* Live price badge */}
+      <div className="absolute top-2 right-2 z-10 bg-blue-500/20 border border-blue-500/30 px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold text-blue-400">
+        {fmtP(livePrice)}
+      </div>
+
+      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="w-full cursor-crosshair"
+        style={{ height: 290 }} onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}>
+        <defs>
+          <linearGradient id="volGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.05" />
+          </linearGradient>
+        </defs>
+
         {/* Grid lines */}
         {priceLabels.map((pl, i) => (
           <g key={i}>
             <line x1={PAD.left} y1={pl.y} x2={W - PAD.right} y2={pl.y}
               stroke="#374151" strokeWidth="0.5" strokeDasharray="3,3" />
-            <text x={PAD.left - 4} y={pl.y + 3} textAnchor="end"
-              fontSize="6" fill="#6B7280">{pl.label}</text>
+            <text x={PAD.left - 6} y={pl.y + 3} textAnchor="end"
+              fontSize="7" fill="#6B7280" fontFamily="monospace">{pl.label}</text>
           </g>
         ))}
 
+        {/* Separator line for volume */}
+        <line x1={PAD.left} y1={PAD.top + candleH + 2} x2={W - PAD.right} y2={PAD.top + candleH + 2}
+          stroke="#374151" strokeWidth="0.5" />
+
         {/* Candles */}
         {candles.map((c, i) => {
-          const x   = PAD.left + (i / candles.length) * chartW + barW / 2;
+          const x   = PAD.left + (i / (candles.length - 1)) * chartW;
           const isUp = c.close >= c.open;
           const col  = isUp ? '#22c55e' : '#ef4444';
           const bodyTop = toY(Math.max(c.open, c.close));
@@ -63,22 +141,56 @@ function CandlestickChart({ candles, livePrice }: { candles: Candle[]; livePrice
             <g key={i}>
               {/* Wick */}
               <line x1={x} y1={toY(c.high)} x2={x} y2={toY(c.low)}
-                stroke={col} strokeWidth="0.8" opacity="0.7" />
+                stroke={col} strokeWidth="1" opacity="0.6" />
               {/* Body */}
               <rect x={x - barW / 2} y={bodyTop} width={barW} height={bodyH}
-                fill={col} rx="0.5" />
+                fill={col} rx={barW > 3 ? 1 : 0} opacity={isUp ? 0.9 : 0.85} />
             </g>
           );
         })}
 
-        {/* Live price line */}
+        {/* Volume bars */}
+        {candles.map((c, i) => {
+          const x = PAD.left + (i / (candles.length - 1)) * chartW;
+          const isUp = c.close >= c.open;
+          const col = isUp ? '#22c55e' : '#ef4444';
+          const vh = Math.max(1, ((c.volume / volMax) * VOL_H));
+          return (
+            <rect key={'v' + i} x={x - barW / 2} y={PAD.top + candleH + 4 + VOL_H - vh}
+              width={barW} height={vh} fill={col} opacity={0.25} rx={0.5}
+            />
+          );
+        })}
+
+        {/* MA7 line */}
+        <path d={maPath(ma7)} fill="none" stroke="#60a5fa" strokeWidth="1.2" opacity="0.8" />
+        {/* MA25 line */}
+        <path d={maPath(ma25)} fill="none" stroke="#fb923c" strokeWidth="1.2" opacity="0.8" strokeDasharray="3,2" />
+
+        {/* Live price horizontal line */}
         <line x1={PAD.left} y1={toY(livePrice)} x2={W - PAD.right} y2={toY(livePrice)}
-          stroke="#3b82f6" strokeWidth="0.8" strokeDasharray="4,2" />
-        <rect x={W - PAD.right} y={toY(livePrice) - 6} width={PAD.right + 30} height={12}
-          fill="#3b82f6" rx="2" />
-        <text x={W - PAD.right + 2} y={toY(livePrice) + 3} fontSize="6" fill="white">
-          {livePrice >= 1000 ? livePrice.toFixed(0) : livePrice.toFixed(4)}
-        </text>
+          stroke="#3b82f6" strokeWidth="0.6" strokeDasharray="4,3" opacity="0.6" />
+
+        {/* Crosshair */}
+        {crosshair && (
+          <g>
+            <line x1={PAD.left} y1={crosshair.y} x2={W - PAD.right} y2={crosshair.y}
+              stroke="#6b7280" strokeWidth="0.5" strokeDasharray="2,2" opacity="0.5" />
+            <line x1={crosshair.x} y1={PAD.top} x2={crosshair.x} y2={PAD.top + candleH + VOL_H + 4}
+              stroke="#6b7280" strokeWidth="0.5" strokeDasharray="2,2" opacity="0.5" />
+            {/* Price tooltip */}
+            <rect x={W - PAD.right + 2} y={crosshair.y - 7} width={PAD.right - 4} height={14}
+              fill="#1f2937" rx="3" stroke="#4b5563" strokeWidth="0.5" />
+            <text x={W - PAD.right + 4} y={crosshair.y + 3} fontSize="7" fill="#e5e7eb" fontFamily="monospace" fontWeight="bold">
+              {fmtP(crosshair.price)}
+            </text>
+            {/* Time tooltip */}
+            <rect x={crosshair.x - 18} y={PAD.top + candleH + VOL_H + 6} width={36} height={14}
+              fill="#1f2937" rx="3" stroke="#4b5563" strokeWidth="0.5" />
+            <text x={crosshair.x} y={PAD.top + candleH + VOL_H + 16} fontSize="7" fill="#e5e7eb"
+              fontFamily="monospace" textAnchor="middle">{crosshair.time}</text>
+          </g>
+        )}
       </svg>
     </div>
   );
