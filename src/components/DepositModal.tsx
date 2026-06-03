@@ -15,8 +15,6 @@ type Step = 'amount' | 'payment' | 'verifying' | 'success' | 'error';
 
 interface DepositModalProps {
   onClose: () => void;
-  customerMobile: string;
-  sessionToken?: string;
   onPaymentSuccess: (amount: number, meta: { orderId: string; utr?: string }) => void | Promise<void>;
 }
 
@@ -38,7 +36,7 @@ function loadPending(): PendingDeposit | null {
   }
 }
 
-const DepositModal: React.FC<DepositModalProps> = ({ onClose, customerMobile, sessionToken, onPaymentSuccess }) => {
+const DepositModal: React.FC<DepositModalProps> = ({ onClose, onPaymentSuccess }) => {
   const [step, setStep] = useState<Step>('amount');
   const [amount, setAmount] = useState('');
   const [phoneInput, setPhoneInput] = useState('');
@@ -50,9 +48,7 @@ const DepositModal: React.FC<DepositModalProps> = ({ onClose, customerMobile, se
   const pollRef = useRef<ReturnType<typeof setInterval>>();
   const creditedRef = useRef(false);
 
-  const mobile = customerMobile
-    ? normalizePayboltMobile(customerMobile)
-    : normalizePayboltMobile(phoneInput);
+  const mobile = normalizePayboltMobile(phoneInput);
 
   const clearPending = () => sessionStorage.removeItem(PENDING_DEPOSIT_KEY);
 
@@ -137,7 +133,6 @@ const DepositModal: React.FC<DepositModalProps> = ({ onClose, customerMobile, se
         customerMobile: mobile,
         amount: amt,
         orderId: oid,
-        sessionToken,
         remark1: 'Tryonetrade',
         remark2: `user-${mobile}`,
       });
@@ -237,26 +232,19 @@ const DepositModal: React.FC<DepositModalProps> = ({ onClose, customerMobile, se
             </div>
 
             {/* Phone Input */}
-            {customerMobile ? (
-              <div className="bg-[#161821] border border-white/5 rounded-2xl p-4">
-                <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Registered Mobile</p>
-                <p className="text-sm font-black text-white">+91 {mobile}</p>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 bg-[#161821] border border-white/10 rounded-2xl px-4 py-3 focus-within:border-blue-500">
-                <Phone className="w-5 h-5 text-gray-500 shrink-0" />
-                <span className="text-gray-400 font-bold text-sm">+91</span>
-                <input
-                  type="tel"
-                  inputMode="numeric"
-                  maxLength={10}
-                  placeholder="10-digit mobile number"
-                  value={phoneInput}
+            <div className="flex items-center gap-2 bg-[#161821] border border-white/10 rounded-2xl px-4 py-3 focus-within:border-blue-500">
+              <Phone className="w-5 h-5 text-gray-500 shrink-0" />
+              <span className="text-gray-400 font-bold text-sm">+91</span>
+              <input
+                type="tel"
+                inputMode="numeric"
+                maxLength={10}
+                placeholder="10-digit mobile number"
+                value={phoneInput}
                   onChange={e => setPhoneInput(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  className="flex-1 bg-transparent text-sm font-bold outline-none tabular-nums"
-                />
-              </div>
-            )}
+                className="flex-1 bg-transparent text-sm font-bold outline-none tabular-nums"
+              />
+            </div>
 
             {/* Amount Input */}
             <div className="bg-[#2d2e3b] rounded-2xl p-5 text-center">

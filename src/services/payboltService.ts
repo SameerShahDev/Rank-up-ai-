@@ -95,7 +95,6 @@ export async function createPayboltOrder(params: {
   customerMobile: string;
   amount: number;
   orderId: string;
-  sessionToken?: string;
   remark1?: string;
   remark2?: string;
 }): Promise<{ success: true; paymentUrl: string; orderId: string } | { success: false; error: string }> {
@@ -132,9 +131,7 @@ export async function createPayboltOrder(params: {
 
     const finalOrderId = data.result.orderId || params.orderId;
 
-    if (params.sessionToken) {
-      await registerPaymentOrder(params.sessionToken, finalOrderId, params.amount);
-    }
+    await registerPaymentOrder(finalOrderId, params.amount);
 
     return {
       success: true,

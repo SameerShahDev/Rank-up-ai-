@@ -15,8 +15,6 @@ const WalletDashboard: React.FC<{
   setAccountMode: (mode: AccountMode) => void;
   demoBalance: number;
   realBalance: number;
-  customerPhone: string;
-  sessionToken?: string;
   onDeposit: (amount: number, meta?: { orderId: string; utr?: string }) => void | Promise<unknown>;
   onWithdraw: (amount: number) => void | Promise<unknown>;
   withdrawalLimit: number;
@@ -26,8 +24,6 @@ const WalletDashboard: React.FC<{
   setAccountMode,
   demoBalance,
   realBalance,
-  customerPhone,
-  sessionToken,
   onDeposit,
   onWithdraw,
   withdrawalLimit,
@@ -335,8 +331,6 @@ const WalletDashboard: React.FC<{
       {/* Modals */}
       {showAdd && (
         <DepositModal
-          customerMobile={customerPhone}
-          sessionToken={sessionToken}
           onClose={() => setShowAdd(false)}
           onPaymentSuccess={async (amt, meta) => {
             await onDeposit(amt, meta);

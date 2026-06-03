@@ -51,18 +51,15 @@ function mapDashboard(row: Record<string, unknown>): AccountDashboard {
   };
 }
 
-export async function fetchAccountDashboard(
-  sessionToken: string,
-  profileId: string,
-): Promise<AccountDashboard | null> {
+export async function fetchAccountDashboard(): Promise<AccountDashboard | null> {
   if (!isSupabaseConfigured || !supabase) {
-    const local = loadLocalSettings(profileId);
     const cached = localStorage.getItem('tryonetrade_profile');
     const p = cached ? JSON.parse(cached) : null;
     if (!p) return null;
+    const local = loadLocalSettings(p.profileId ?? '');
     return {
       profile: {
-        profileId: p.profileId ?? profileId,
+        profileId: p.profileId ?? '',
         email: p.email ?? '',
         displayName: p.displayName ?? null,
         demoBalance: p.demoBalance ?? 10000,
@@ -80,9 +77,7 @@ export async function fetchAccountDashboard(
     };
   }
 
-  const { data, error } = await supabase.rpc('get_account_dashboard', {
-    p_session_token: sessionToken,
-  });
+  const { data, error } = await supabase.rpc('get_my_account_dashboard');
 
   if (error || !data) return null;
   const r = data as Record<string, unknown>;
@@ -91,16 +86,18 @@ export async function fetchAccountDashboard(
 }
 
 export async function saveUserSettings(
-  sessionToken: string,
-  profileId: string,
   settings: UserSettings,
 ): Promise<boolean> {
-  saveLocalSettings(profileId, settings);
+  // Also save locally
+  const cached = localStorage.getItem('tryonetrade_profile');
+  const p = cached ? JSON.parse(cached) : null;
+  if (p?.profileId) {
+    saveLocalSettings(p.profileId, settings);
+  }
 
   if (!isSupabaseConfigured || !supabase) return true;
 
-  const { data, error } = await supabase.rpc('update_user_settings', {
-    p_session_token: sessionToken,
+  const { data, error } = await supabase.rpc('update_my_settings', {
     p_confirm_trade: settings.confirmTrade,
     p_one_click: settings.oneClickTrading,
     p_push_notifications: settings.pushNotifications,

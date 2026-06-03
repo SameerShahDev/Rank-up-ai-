@@ -230,14 +230,12 @@ const TradingDashboard: React.FC<{
   balance: number;
   setBalance: React.Dispatch<React.SetStateAction<number>>;
   realBalance: number;
-  customerPhone: string;
-  sessionToken?: string;
   onDeposit: (amount: number, meta?: { orderId: string; utr?: string }) => void | Promise<void>;
   onWithdraw: (amount: number) => void;
   addTransaction: (tx: Record<string, string>) => void;
 }> = ({
   accountMode, setAccountMode, balance, setBalance, realBalance,
-  customerPhone, sessionToken, onDeposit, onWithdraw, addTransaction,
+  onDeposit, onWithdraw, addTransaction,
 }) => {
   const [showDeposit, setShowDeposit] = useState(false);
   const [showWithdraw, setShowWithdraw] = useState(false);
@@ -558,8 +556,6 @@ const TradingDashboard: React.FC<{
       {/* ── Modals ─────────────────────────────────────────────────── */}
       {showDeposit && (
         <DepositModal
-          customerMobile={customerPhone}
-          sessionToken={sessionToken}
           onClose={() => setShowDeposit(false)}
           onPaymentSuccess={async (amt, meta) => { await onDeposit(amt, meta); setAccountMode('real'); }}
         />

@@ -86,8 +86,8 @@ function AppShell() {
   };
 
   const handleDeposit = async (amount: number, meta?: { orderId: string; utr?: string }) => {
-    const res = meta?.orderId && profile?.sessionToken
-      ? await finalizePayboltDeposit(profile.sessionToken, meta.orderId, amount, meta.utr)
+    const res = meta?.orderId
+      ? await finalizePayboltDeposit(meta.orderId, amount, meta.utr)
       : await depositReal(amount, 'paybolt');
     if (res.success) {
       await refreshDashboard();
@@ -130,7 +130,16 @@ function AppShell() {
 
   if (isLoading) {
     return (
-      <div className="min-h-[100dvh] bg-[#0a0b0f] flex items-center justify-center">
+      <div className="min-h-[100dvh] bg-[#0a0b0f] flex flex-col items-center justify-center gap-6">
+        <img
+          src="/logo/logo.png"
+          alt="Tryonetrade"
+          className="w-32 h-32 rounded-3xl object-cover shadow-[0_0_60px_rgba(37,99,235,0.4)] border-2 border-blue-400/30"
+        />
+        <div className="flex flex-col items-center gap-1">
+          <span className="font-black text-2xl tracking-tighter text-white">TRYONETRADE</span>
+          <span className="text-[10px] font-black text-blue-500 uppercase tracking-[0.3em]">Loading...</span>
+        </div>
         <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -156,8 +165,6 @@ function AppShell() {
             setAccountMode={setAccountMode}
             demoBalance={demoBalance}
             realBalance={realBalance}
-            customerPhone=""
-            sessionToken={profile?.sessionToken}
             onDeposit={handleDeposit}
             onWithdraw={handleWithdraw}
             withdrawalLimit={WITHDRAWAL_LIMIT}
@@ -172,8 +179,6 @@ function AppShell() {
             balance={activeBalance}
             setBalance={setActiveBalance}
             realBalance={realBalance}
-            customerPhone=""
-            sessionToken={profile?.sessionToken}
             onDeposit={handleDeposit}
             onWithdraw={handleWithdraw}
             addTransaction={addTransaction}

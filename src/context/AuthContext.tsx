@@ -15,7 +15,7 @@ import type { AccountMode } from '../types/account';
 import { INITIAL_DEMO_BALANCE } from '../types/account';
 import type { UserProfile } from '../types/profile';
 import {
-  loadSessionProfile,
+  getCurrentSession,
   syncBalances,
   saveTransaction,
   fetchTransactionsFromDb,
@@ -27,7 +27,7 @@ import {
 import { fetchAccountDashboard, saveUserSettings } from '../services/settingsService';
 import type { AccountStats, UserSettings } from '../types/settings';
 import { DEFAULT_SETTINGS } from '../types/settings';
-import { isSupabaseConfigured } from '../lib/supabase';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
 
 interface AuthContextValue {
   profile: UserProfile | null;
@@ -83,7 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!profile) return;
     setSettingsLoading(true);
     try {
-      const dash = await fetchAccountDashboard(profile.sessionToken, profile.profileId);
+      const dash = await fetchAccountDashboard();
       if (dash) {
         setUserSettings(dash.settings);
         setAccountStats(dash.stats);
@@ -104,11 +104,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [profile]);
 
+  // ─── Load session on mount ───────────────────────────────────────────
   useEffect(() => {
     console.log('[AuthContext] Loading session...');
-    loadSessionProfile().then(p => {
+    getCurrentSession().then(p => {
       if (p) {
-        console.log('[AuthContext] Session loaded:', p.email, '| needsName:', p.needsName);
+        console.log('[AuthContext] Session loaded:', p.email);
         setProfile(p);
         setDemoBalance(p.demoBalance);
         setRealBalance(p.realBalance);
@@ -119,13 +120,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // ─── Listen for auth state changes (Google OAuth redirect, etc.) ─────
   useEffect(() => {
-    if (!profile || profile.needsName) return;
+    if (!supabase) return;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('[AuthContext] Auth state change:', event);
+        if (event === 'SIGNED_IN' && session?.user) {
+          const { loadUserProfile } = await import('../services/authService');
+          const prof = await loadUserProfile();
+          if (prof) {
+            setProfile(prof);
+            setDemoBalance(prof.demoBalance);
+            setRealBalance(prof.realBalance);
+          }
+          setIsLoading(false);
+        } else if (event === 'SIGNED_OUT') {
+          setProfile(null);
+          setDemoBalance(INITIAL_DEMO_BALANCE);
+          setRealBalance(0);
+          setUserSettings(DEFAULT_SETTINGS);
+          setAccountStats(null);
+        }
+      },
+    );
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // ─── Load dashboard when profile is ready ────────────────────────────
+  useEffect(() => {
+    if (!profile) return;
     let cancelled = false;
     (async () => {
       setSettingsLoading(true);
       try {
-        const dash = await fetchAccountDashboard(profile.sessionToken, profile.profileId);
+        const dash = await fetchAccountDashboard();
         if (cancelled || !dash) return;
         setUserSettings(dash.settings);
         setAccountStats(dash.stats);
@@ -145,11 +174,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [profile?.profileId, profile?.needsName]);
+  }, [profile?.profileId]);
 
+  // ─── Auto-sync balances ──────────────────────────────────────────────
   const persistBalances = useCallback(async () => {
     if (!profile) return;
-    await syncBalances(profile.sessionToken, demoBalance, realBalance);
+    await syncBalances(demoBalance, realBalance);
     setProfile(prev => prev ? { ...prev, demoBalance, realBalance } : prev);
   }, [profile, demoBalance, realBalance]);
 
@@ -185,7 +215,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const addTransactionDb = useCallback(async (tx: Record<string, string>) => {
     if (!profile) return;
-    await saveTransaction(profile.sessionToken, {
+    await saveTransaction({
       type: tx.type,
       coin: tx.coin,
       amount: tx.amount,
@@ -196,7 +226,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const depositReal = useCallback(async (amount: number, method = 'upi') => {
     if (!profile) return { success: false };
-    const res = await depositToDb(profile.sessionToken, amount, method);
+    const res = await depositToDb(amount, method);
     if (res.success) {
       setRealBalance(prev => prev + amount);
       await refreshDashboard();
@@ -206,7 +236,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const withdrawReal = useCallback(async (amount: number) => {
     if (!profile) return { success: false };
-    const res = await withdrawFromDb(profile.sessionToken, amount);
+    const res = await withdrawFromDb(amount);
     if (res.success) {
       setRealBalance(prev => Math.max(0, prev - amount));
       await refreshDashboard();
@@ -216,7 +246,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loadTransactions = useCallback(async () => {
     if (!profile) return null;
-    return fetchTransactionsFromDb(profile.sessionToken);
+    return fetchTransactionsFromDb();
   }, [profile]);
 
   const updateUserSettings = useCallback(async (patch: Partial<UserSettings>) => {
@@ -224,14 +254,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const next = { ...userSettings, ...patch };
     setUserSettings(next);
     if (patch.defaultAccountMode) setAccountMode(patch.defaultAccountMode);
-    await saveUserSettings(profile.sessionToken, profile.profileId, next);
+    await saveUserSettings(next);
   }, [profile, userSettings]);
 
   const renameProfile = useCallback(async (name: string) => {
     if (!profile) return { success: false, error: 'Not signed in' };
-    const res = await updateDisplayName(profile.sessionToken, name);
+    const res = await updateDisplayName(name);
     if (res.success) {
-      setProfile(prev => prev ? { ...prev, displayName: name.trim(), needsName: false } : prev);
+      setProfile(prev => prev ? { ...prev, displayName: name.trim() } : prev);
     }
     return res;
   }, [profile]);
@@ -239,7 +269,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<AuthContextValue>(() => ({
     profile,
     isLoading,
-    isAuthenticated: Boolean(profile && !profile.needsName),
+    isAuthenticated: Boolean(profile),
     accountMode,
     setAccountMode,
     demoBalance,
