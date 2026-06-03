@@ -70,11 +70,11 @@ function generateCandles(symbol: string, fromPrice: number, count: number, start
   for (let i = 0; i < count; i++) {
     const open   = price;
     const mid    = (seed.hi + seed.lo) / 2;
-    const revert = (mid - price) * 0.008; // weak reversion = more wild
+    const revert = (mid - price) * 0.005; // even weaker reversion
     const change = (Math.random() - 0.48) * volatility + revert;
-    const close  = Math.min(Math.max(open + change, seed.lo * 0.9), seed.hi * 1.1);
+    const close  = Math.min(Math.max(open + change, seed.lo * 0.5), seed.hi * 1.5);
 
-    const wickFactor = 1.5 + Math.random() * 4.0; // huge wicks
+    const wickFactor = 2.0 + Math.random() * 6.0; // massive wicks 2x-8x
     const high = Math.max(open, close) + Math.abs(Math.random() * volatility * wickFactor);
     const low  = Math.min(open, close) - Math.abs(Math.random() * volatility * wickFactor);
     const volume = seed.start * (300 + Math.random() * 1200);
@@ -82,8 +82,8 @@ function generateCandles(symbol: string, fromPrice: number, count: number, start
     candles.push({
       time: startTime + i * interval,
       open,
-      high: Math.min(high, seed.hi * 1.15),
-      low:  Math.max(low,  seed.lo * 0.85),
+      high: Math.min(high, seed.hi * 2.0),
+      low:  Math.max(low,  seed.lo * 0.3),
       close,
       volume,
     });
@@ -262,25 +262,25 @@ export function tickPrices(): void {
 
     // Smoothly build live candle tick-by-tick toward nextCandle's close
     const progress = tc / TICKS_PER_CANDLE;
-    const noise    = (nextCandle.high - nextCandle.low) * (Math.random() - 0.5) * 2.5; // very heavy noise
+    const noise    = (nextCandle.high - nextCandle.low) * (Math.random() - 0.5) * 4.0; // extreme noise
     let tickMove   = lc.open + (nextCandle.close - lc.open) * Math.min(progress, 1) + noise;
 
-    // Frequent sharp spikes (20% chance)
-    if (Math.random() < 0.20) {
+    // Frequent sharp spikes (25% chance)
+    if (Math.random() < 0.25) {
       const spikeDir  = Math.random() > 0.5 ? 1 : -1;
-      const spikeSize = nextCandle.close * (0.01 + Math.random() * 0.03);
+      const spikeSize = nextCandle.close * (0.01 + Math.random() * 0.04);
       tickMove += spikeDir * spikeSize;
     }
 
-    // Occasional mega spike (3% chance)
-    if (Math.random() < 0.03) {
+    // Mega spike (5% chance)
+    if (Math.random() < 0.05) {
       const spikeDir  = Math.random() > 0.5 ? 1 : -1;
-      tickMove += spikeDir * nextCandle.close * (0.03 + Math.random() * 0.05);
+      tickMove += spikeDir * nextCandle.close * (0.04 + Math.random() * 0.06);
     }
 
     lc.close = tickMove;
-    lc.high  = Math.max(lc.high, lc.close);
-    lc.low   = Math.min(lc.low,  lc.close);
+    lc.high  = Math.max(lc.high, lc.close, lc.open + Math.abs(noise) * 2);
+    lc.low   = Math.min(lc.low,  lc.close, lc.open - Math.abs(noise) * 2);
 
     // Candle complete — advance head
     if (tc >= TICKS_PER_CANDLE) {
