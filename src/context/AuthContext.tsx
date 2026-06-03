@@ -124,6 +124,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .finally(() => {
         setIsLoading(false);
       });
+
+    // Safety net — force stop loading after 8 seconds no matter what
+    const forceStop = setTimeout(() => {
+      console.warn('[AuthContext] Safety timeout — forcing loading off');
+      setIsLoading(false);
+    }, 8000);
+    return () => clearTimeout(forceStop);
   }, []);
 
   // ─── Listen for auth state changes (Google OAuth redirect, etc.) ─────
@@ -133,33 +140,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async (event, session) => {
         console.log('[AuthContext] Auth state change:', event);
         if (event === 'SIGNED_IN' && session?.user) {
+          const u = session.user;
+          const fallback: UserProfile = {
+            profileId: u.id,
+            email: u.email ?? '',
+            displayName: (u.user_metadata?.display_name as string) ?? null,
+            demoBalance: 10000,
+            realBalance: 0,
+          };
           try {
             const { loadUserProfile } = await import('../services/authService');
-            const prof = await loadUserProfile();
+            const prof = await Promise.race([
+              loadUserProfile(),
+              new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+            ]);
+            setProfile(prof ?? fallback);
             if (prof) {
-              setProfile(prof);
               setDemoBalance(prof.demoBalance);
               setRealBalance(prof.realBalance);
-            } else {
-              const u = session.user;
-              setProfile({
-                profileId: u.id,
-                email: u.email ?? '',
-                displayName: (u.user_metadata?.display_name as string) ?? null,
-                demoBalance: 10000,
-                realBalance: 0,
-              });
             }
           } catch (e) {
             console.warn('[AuthContext] Profile load error, using fallback:', e);
-            const u = session.user;
-            setProfile({
-              profileId: u.id,
-              email: u.email ?? '',
-              displayName: (u.user_metadata?.display_name as string) ?? null,
-              demoBalance: 10000,
-              realBalance: 0,
-            });
+            setProfile(fallback);
           }
           setIsLoading(false);
         } else if (event === 'SIGNED_OUT') {

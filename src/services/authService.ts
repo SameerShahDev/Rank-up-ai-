@@ -198,7 +198,13 @@ export async function loadUserProfile(): Promise<UserProfile | null> {
   }
 
   try {
-    const { data, error } = await supabase.rpc('get_my_profile');
+    const result = await Promise.race([
+      supabase.rpc('get_my_profile'),
+      new Promise<{ data: null; error: { message: string } }>((_, reject) =>
+        setTimeout(() => reject(new Error('Profile load timeout')), 5000)
+      ),
+    ]);
+    const { data, error } = result;
     if (error || !data) {
       console.warn('[Auth] Profile load failed:', error?.message ?? 'no data');
       return null;
@@ -218,7 +224,13 @@ export async function getCurrentSession(): Promise<UserProfile | null> {
   }
 
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const result = await Promise.race([
+      supabase.auth.getUser(),
+      new Promise<{ data: { user: null }; error: null }>((_, reject) =>
+        setTimeout(() => reject(new Error('Session timeout')), 5000)
+      ),
+    ]);
+    const { data: { user } } = result;
     if (!user) {
       console.log('[Auth] No active session');
       return null;
@@ -228,7 +240,6 @@ export async function getCurrentSession(): Promise<UserProfile | null> {
     const profile = await loadUserProfile();
     if (profile) return profile;
 
-    // Fallback
     return {
       profileId: user.id,
       email: user.email ?? '',
