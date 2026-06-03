@@ -66,22 +66,59 @@ function generateCandles(symbol: string, fromPrice: number, count: number, start
 
   const candles: Candle[] = [];
   let price = fromPrice;
-  let trendDir = Math.random() > 0.5 ? 1 : -1;
-  let trendStrength = 0;
-  let trendAge = 0;
+  let regime = Math.random() > 0.5 ? 'bull' : 'bear';
+  let regimeAge = 0;
+  let regimeLen = 5 + Math.floor(Math.random() * 15);
 
   for (let i = 0; i < count; i++) {
     const open   = price;
     const mid    = (seed.hi + seed.lo) / 2;
-    const revert = (mid - price) * 0.004;
+    const revert = (mid - price) * 0.002;
 
-    // Trend momentum — runs for 5-20 candles, then may flip
-    trendAge++;
-    if (trendAge > 5 + Math.floor(Math.random() * 15)) {
-      if (Math.random() < 0.3) trendDir *= -1; // 30% chance to flip
-      trendStrength = 0.5 + Math.random() * 1.0;
-      trendAge = 0;
+    // Regime switch
+    regimeAge++;
+    if (regimeAge >= regimeLen) {
+      regimeAge = 0;
+      regimeLen = 4 + Math.floor(Math.random() * 16);
+      const r = Math.random();
+      if (r < 0.35) regime = 'bull';
+      else if (r < 0.7) regime = 'bear';
+      else regime = 'chop';
     }
+
+    let trend: number;
+    let noiseScale: number;
+    if (regime === 'bull') {
+      trend = volatility * (0.3 + Math.random() * 0.4); // +30% to +70%
+      noiseScale = 1.0;
+    } else if (regime === 'bear') {
+      trend = -volatility * (0.3 + Math.random() * 0.4); // -30% to -70%
+      noiseScale = 1.0;
+    } else {
+      // Choppy — rapid switching, high noise, small direction bias
+      trend = (Math.random() - 0.5) * volatility * 0.5;
+      noiseScale = 2.0;
+    }
+
+    const noise = (Math.random() - 0.48) * volatility * noiseScale;
+    const change = noise + revert + trend;
+    const close  = Math.min(Math.max(open + change, seed.lo * 0.3), seed.hi * 2.0);
+
+    const wickFactor = 2.0 + Math.random() * 8.0;
+    const high = Math.max(open, close) + Math.abs(Math.random() * volatility * wickFactor);
+    const low  = Math.min(open, close) - Math.abs(Math.random() * volatility * wickFactor);
+    const volume = seed.start * (300 + Math.random() * 1200);
+
+    candles.push({
+      time: startTime + i * interval,
+      open,
+      high: Math.min(high, seed.hi * 2.5),
+      low:  Math.max(low,  seed.lo * 0.2),
+      close,
+      volume,
+    });
+    price = close;
+  }
     trendStrength = Math.min(trendStrength + 0.05, 1.5);
 
     const trend = trendDir * volatility * 0.15 * trendStrength;
@@ -277,29 +314,41 @@ export function tickPrices(): void {
 
     // Trend bias: candle close relative to open tells us direction
     const candleDir = nextCandle.close >= nextCandle.open ? 1 : -1;
-    const trendBias = candleDir * (nextCandle.high - nextCandle.low) * 0.08;
+    const candleRange = nextCandle.high - nextCandle.low;
+    const trendBias = candleDir * candleRange * 0.15;
+
+    // Detect regime from candle body vs wick ratio
+    const bodySize = Math.abs(nextCandle.close - nextCandle.open);
+    const bodyRatio = bodySize / (candleRange || 1);
+    const isChoppy = bodyRatio < 0.2;
+    const noiseMultiplier = isChoppy ? 8.0 : 5.0;
 
     // Smoothly build live candle tick-by-tick toward nextCandle's close
     const progress = tc / TICKS_PER_CANDLE;
-    const noise    = (nextCandle.high - nextCandle.low) * (Math.random() - 0.5) * 5.0; // extreme noise
+    const noise    = candleRange * (Math.random() - 0.5) * noiseMultiplier;
     let tickMove   = lc.open + (nextCandle.close - lc.open) * Math.min(progress, 1) + noise + trendBias;
 
-    // Frequent sharp spikes (25% chance)
-    if (Math.random() < 0.25) {
+    // Whipsaw in choppy mode — extra random bounce
+    if (isChoppy && Math.random() < 0.4) {
+      tickMove += candleRange * (Math.random() - 0.5) * 0.8;
+    }
+
+    // Frequent sharp spikes (30% chance)
+    if (Math.random() < 0.30) {
       const spikeDir  = Math.random() > 0.5 ? 1 : -1;
-      const spikeSize = nextCandle.close * (0.01 + Math.random() * 0.04);
+      const spikeSize = nextCandle.close * (0.01 + Math.random() * 0.05);
       tickMove += spikeDir * spikeSize;
     }
 
-    // Mega spike (5% chance)
-    if (Math.random() < 0.05) {
+    // Mega spike (8% chance)
+    if (Math.random() < 0.08) {
       const spikeDir  = Math.random() > 0.5 ? 1 : -1;
-      tickMove += spikeDir * nextCandle.close * (0.04 + Math.random() * 0.06);
+      tickMove += spikeDir * nextCandle.close * (0.05 + Math.random() * 0.08);
     }
 
     lc.close = tickMove;
-    lc.high  = Math.max(lc.high, lc.close, lc.open + Math.abs(noise) * 2);
-    lc.low   = Math.min(lc.low,  lc.close, lc.open - Math.abs(noise) * 2);
+    lc.high  = Math.max(lc.high, lc.close, lc.open + Math.abs(noise) * 2 + candleRange * 0.3);
+    lc.low   = Math.min(lc.low,  lc.close, lc.open - Math.abs(noise) * 2 - candleRange * 0.3);
 
     // Candle complete — advance head
     if (tc >= TICKS_PER_CANDLE) {
