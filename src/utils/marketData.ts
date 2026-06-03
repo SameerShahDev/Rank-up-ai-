@@ -62,7 +62,7 @@ function generateCandles(symbol: string, fromPrice: number, count: number, start
   const seed       = PRICE_SEEDS[symbol];
   const interval   = 4 * 60 * 60 * 1000; // 4H
   const priceRange = seed.hi - seed.lo;
-  const volatility = priceRange * 0.055;
+  const volatility = priceRange * 0.12; // 12% — much bigger swings
 
   const candles: Candle[] = [];
   let price = fromPrice;
@@ -74,7 +74,7 @@ function generateCandles(symbol: string, fromPrice: number, count: number, start
     const change = (Math.random() - 0.48) * volatility + revert;
     const close  = Math.min(Math.max(open + change, seed.lo * 0.9), seed.hi * 1.1);
 
-    const wickFactor = 0.6 + Math.random() * 2.0;
+    const wickFactor = 1.0 + Math.random() * 3.0; // bigger wicks
     const high = Math.max(open, close) + Math.abs(Math.random() * volatility * wickFactor);
     const low  = Math.min(open, close) - Math.abs(Math.random() * volatility * wickFactor);
     const volume = seed.start * (300 + Math.random() * 1200);
@@ -104,7 +104,7 @@ const _buffer:     Record<string, Candle[]>  = {};
 const _headIdx:    Record<string, number>    = {};
 const _liveCandle: Record<string, Candle>    = {};
 const _tickCount:  Record<string, number>    = {};
-const TICKS_PER_CANDLE = 10;
+const TICKS_PER_CANDLE = 4; // 4 × 400ms = 1.6 sec per candle — fast, exciting
 
 // ─── localStorage persistence ─────────────────────────────────────────────
 const STORAGE_PREFIX = 'tryonetrade_market_';
@@ -262,14 +262,20 @@ export function tickPrices(): void {
 
     // Smoothly build live candle tick-by-tick toward nextCandle's close
     const progress = tc / TICKS_PER_CANDLE;
-    const noise    = (nextCandle.high - nextCandle.low) * (Math.random() - 0.5) * 0.4;
+    const noise    = (nextCandle.high - nextCandle.low) * (Math.random() - 0.5) * 1.2; // heavy noise
     let tickMove   = lc.open + (nextCandle.close - lc.open) * Math.min(progress, 1) + noise;
 
-    // Occasional sharp spike (1.5% chance)
-    if (Math.random() < 0.015) {
+    // Frequent sharp spikes (8% chance)
+    if (Math.random() < 0.08) {
       const spikeDir  = Math.random() > 0.5 ? 1 : -1;
-      const spikeSize = nextCandle.close * (0.002 + Math.random() * 0.006);
+      const spikeSize = nextCandle.close * (0.005 + Math.random() * 0.015);
       tickMove += spikeDir * spikeSize;
+    }
+
+    // Occasional mega spike (1% chance)
+    if (Math.random() < 0.01) {
+      const spikeDir  = Math.random() > 0.5 ? 1 : -1;
+      tickMove += spikeDir * nextCandle.close * (0.02 + Math.random() * 0.03);
     }
 
     lc.close = tickMove;

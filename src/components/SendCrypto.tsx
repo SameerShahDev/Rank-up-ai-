@@ -346,7 +346,7 @@ const TradingView: React.FC = () => {
 
   const currentPrice = livePrices[activeMarket.symbol] ?? activeMarket.basePrice;
 
-  // Tick prices every second
+  // Tick prices every 400ms for fast movement
   useEffect(() => {
     const id = setInterval(() => {
       tickPrices();
@@ -355,7 +355,7 @@ const TradingView: React.FC = () => {
         MARKETS.forEach(m => { next[m.symbol] = getLivePrice(m.symbol); });
         return next;
       });
-    }, 600);
+    }, 400);
     return () => clearInterval(id);
   }, []);
 

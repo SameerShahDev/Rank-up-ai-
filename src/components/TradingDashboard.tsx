@@ -325,14 +325,14 @@ const TradingDashboard: React.FC<{
   useEffect(() => { priceRef.current = price; }, [price]);
   useEffect(() => { setPrice(getLivePrice(SYMBOL_MAP[asset.id] ?? 'BTC/INR')); }, [asset]);
 
-  // Tick market engine + update local price/candles
+  // Tick market engine + update local price/candles (400ms = fast updates)
   useEffect(() => {
     const iv = setInterval(() => {
       tickPrices();
       const sym = SYMBOL_MAP[asset.id] ?? 'BTC/INR';
       setPrice(getLivePrice(sym));
       setCandles(getLiveCandles(sym, 60));
-    }, 600);
+    }, 400);
     return () => clearInterval(iv);
   }, [asset]);
 
