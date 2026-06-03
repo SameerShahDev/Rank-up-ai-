@@ -160,9 +160,7 @@ const CandlestickChart = ({
 
       // Body — solid filled (both green and red)
       ctx.fillStyle = isUp ? '#26a69a' : '#ef5350';
-      ctx.beginPath();
-      ctx.roundRect(x - barW / 2, bodyTop, barW, bodyH, 1);
-      ctx.fill();
+      ctx.fillRect(x - barW / 2, bodyTop, barW, bodyH);
     });
 
     // Live price dotted line
@@ -181,10 +179,10 @@ const CandlestickChart = ({
     ctx.font = 'bold 10px -apple-system, monospace';
     const plW = ctx.measureText(priceLabel).width + 12;
     ctx.fillStyle = '#2962ff';
-    ctx.beginPath();
-    ctx.roundRect(W - pad.right - 1, liveY - 10, plW, 20, 3);
-    ctx.fill();
+    ctx.fillRect(W - pad.right - 1, liveY - 10, plW, 20);
     ctx.fillStyle = '#fff';
+    ctx.textAlign = 'left';
+    ctx.fillText(priceLabel, W - pad.right + 5, liveY + 3);
     ctx.textAlign = 'left';
     ctx.fillText(priceLabel, W - pad.right + 5, liveY + 3);
 
@@ -472,6 +470,48 @@ const TradingDashboard: React.FC<{
           activeTrades={activeTrades}
           primaryTrade={primaryTrade}
         />
+        {/* Asset overlay */}
+        <div className="absolute top-2 left-2 pointer-events-none">
+          <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[#1e222d]/90 backdrop-blur-sm border border-[#2a2e39]/60">
+            <span className="text-base" style={{ color: asset.color }}>{asset.icon}</span>
+            <div>
+              <p className="text-[11px] font-bold text-white">{asset.name}</p>
+              <p className="text-[10px] font-mono" style={{
+                color: ((price - asset.basePrice) / asset.basePrice * 100) >= 0 ? C.up : C.down
+              }}>
+                {((price - asset.basePrice) / asset.basePrice * 100) >= 0 ? '+' : ''}
+                {((price - asset.basePrice) / asset.basePrice * 100).toFixed(2)}%
+              </p>
+            </div>
+          </div>
+        </div>
+        {/* OHLCV overlay */}
+        {candles.length > 0 && (
+          <div className="absolute top-2 right-2 pointer-events-none">
+            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[#1e222d]/90 backdrop-blur-sm border border-[#2a2e39]/60 text-[10px] font-mono">
+              <span className="text-gray-500">O <span className="text-white">{
+                candles[candles.length - 1].open >= 1000
+                  ? candles[candles.length - 1].open.toFixed(0)
+                  : candles[candles.length - 1].open.toFixed(2)
+              }</span></span>
+              <span className="text-gray-500">H <span className="text-[#26a69a]">{
+                candles[candles.length - 1].high >= 1000
+                  ? candles[candles.length - 1].high.toFixed(0)
+                  : candles[candles.length - 1].high.toFixed(2)
+              }</span></span>
+              <span className="text-gray-500">L <span className="text-[#ef5350]">{
+                candles[candles.length - 1].low >= 1000
+                  ? candles[candles.length - 1].low.toFixed(0)
+                  : candles[candles.length - 1].low.toFixed(2)
+              }</span></span>
+              <span className="text-gray-500">C <span className="text-white">{
+                candles[candles.length - 1].close >= 1000
+                  ? candles[candles.length - 1].close.toFixed(0)
+                  : candles[candles.length - 1].close.toFixed(2)
+              }</span></span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Controls ───────────────────────────────────────────────── */}
