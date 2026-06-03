@@ -479,22 +479,40 @@ const TradingDashboard: React.FC<{
 
         {/* Active trades */}
         {activeTrades.length > 0 && (
-          <div className="mb-2 space-y-1 max-h-20 overflow-y-auto">
+          <div className="mb-2 space-y-1.5 max-h-20 overflow-y-auto">
             {activeTrades.map(t => {
               const isUp = t.type === 'UP';
               const pnl = isUp
                 ? ((price - t.entryPrice) / t.entryPrice) * t.amount
                 : ((t.entryPrice - price) / t.entryPrice) * t.amount;
+              const isProfit = pnl >= 0;
               return (
-                <div key={t.id} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs ${
-                  isUp ? 'bg-[#26a69a]/10' : 'bg-[#ef5350]/10'
-                }`}>
-                  <span className="font-bold" style={{ color: isUp ? C.up : C.down }}>{t.type}</span>
-                  <span className="text-white">₹{t.amount}</span>
-                  <span className="ml-auto font-mono font-bold tabular-nums" style={{ color: pnl >= 0 ? C.up : C.down }}>
-                    {pnl >= 0 ? '+' : ''}₹{pnl.toFixed(0)}
-                  </span>
-                  <span className="text-gray-500 font-mono text-[10px]">{t.timeLeft}s</span>
+                <div key={t.id} className="flex items-center gap-2 px-2 py-2 rounded-lg text-xs border" style={{
+                  backgroundColor: isProfit ? 'rgba(38,166,154,0.08)' : 'rgba(239,83,80,0.08)',
+                  borderColor: isProfit ? 'rgba(38,166,154,0.2)' : 'rgba(239,83,80,0.2)',
+                }}>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-black" style={{
+                      backgroundColor: isProfit ? 'rgba(38,166,154,0.2)' : 'rgba(239,83,80,0.2)',
+                      color: isProfit ? C.up : C.down,
+                    }}>
+                      {isProfit ? '▲' : '▼'}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-white text-[11px]">₹{t.amount} · {t.type}</span>
+                      <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${isProfit ? 'bg-[#26a69a]/20 text-[#26a69a]' : 'bg-[#ef5350]/20 text-[#ef5350]'}`}>
+                        {isProfit ? 'PROFIT' : 'LOSS'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between mt-0.5">
+                      <span className="text-[10px] font-mono text-gray-500">{formatTime(t.timeLeft)} left</span>
+                      <span className="text-xs font-black tabular-nums" style={{ color: isProfit ? C.up : C.down }}>
+                        {pnl >= 0 ? '+' : ''}₹{pnl.toFixed(0)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               );
             })}
@@ -573,19 +591,25 @@ const TradingDashboard: React.FC<{
       {/* ── Result Popup ───────────────────────────────────────────── */}
       {result && (
         <div className="absolute inset-x-0 top-16 z-[100] flex justify-center pointer-events-none animate-[slideUp_0.3s_ease-out]">
-          <div className={`flex items-center gap-4 px-6 py-4 rounded-2xl border-2 shadow-2xl backdrop-blur-sm ${
-            result.win ? 'bg-[#26a69a]/10 border-[#26a69a]/80' : 'bg-[#ef5350]/10 border-[#ef5350]/80'
-          }`}>
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-              result.win ? 'bg-[#26a69a]/15' : 'bg-[#ef5350]/15'
-            }`}>
+          <div className="flex items-center gap-5 px-8 py-5 rounded-2xl border-2 shadow-2xl backdrop-blur-md" style={{
+            backgroundColor: result.win ? 'rgba(38,166,154,0.12)' : 'rgba(239,83,80,0.12)',
+            borderColor: result.win ? '#26a69a' : '#ef5350',
+            boxShadow: result.win
+              ? '0 0 40px rgba(38,166,154,0.2), 0 8px 32px rgba(0,0,0,0.4)'
+              : '0 0 40px rgba(239,83,80,0.2), 0 8px 32px rgba(0,0,0,0.4)',
+          }}>
+            <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{
+              backgroundColor: result.win ? 'rgba(38,166,154,0.2)' : 'rgba(239,83,80,0.2)',
+            }}>
               {result.win
-                ? <TrendingUp className="w-6 h-6" style={{ color: C.up }} />
-                : <TrendingDown className="w-6 h-6" style={{ color: C.down }} />}
+                ? <TrendingUp className="w-8 h-8" strokeWidth={2.5} style={{ color: C.up }} />
+                : <TrendingDown className="w-8 h-8" strokeWidth={2.5} style={{ color: C.down }} />}
             </div>
             <div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase">{result.win ? 'Profit' : 'Loss'}</p>
-              <p className="text-2xl font-black tabular-nums" style={{ color: result.win ? C.up : C.down }}>
+              <p className="text-[11px] font-black tracking-widest uppercase" style={{ color: result.win ? C.up : C.down }}>
+                {result.win ? 'PROFIT' : 'LOSS'}
+              </p>
+              <p className="text-3xl font-black tabular-nums mt-1" style={{ color: result.win ? C.up : C.down }}>
                 {result.amt >= 0 ? '+' : ''}₹{Math.abs(result.amt).toLocaleString('en-IN')}
               </p>
             </div>
