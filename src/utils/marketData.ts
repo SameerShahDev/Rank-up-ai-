@@ -66,12 +66,27 @@ function generateCandles(symbol: string, fromPrice: number, count: number, start
 
   const candles: Candle[] = [];
   let price = fromPrice;
+  let trendDir = Math.random() > 0.5 ? 1 : -1;
+  let trendStrength = 0;
+  let trendAge = 0;
 
   for (let i = 0; i < count; i++) {
     const open   = price;
     const mid    = (seed.hi + seed.lo) / 2;
-    const revert = (mid - price) * 0.005; // even weaker reversion
-    const change = (Math.random() - 0.48) * volatility + revert;
+    const revert = (mid - price) * 0.004;
+
+    // Trend momentum — runs for 5-20 candles, then may flip
+    trendAge++;
+    if (trendAge > 5 + Math.floor(Math.random() * 15)) {
+      if (Math.random() < 0.3) trendDir *= -1; // 30% chance to flip
+      trendStrength = 0.5 + Math.random() * 1.0;
+      trendAge = 0;
+    }
+    trendStrength = Math.min(trendStrength + 0.05, 1.5);
+
+    const trend = trendDir * volatility * 0.15 * trendStrength;
+    const noise = (Math.random() - 0.48) * volatility;
+    const change = noise + revert + trend;
     const close  = Math.min(Math.max(open + change, seed.lo * 0.5), seed.hi * 1.5);
 
     const wickFactor = 2.0 + Math.random() * 6.0; // massive wicks 2x-8x
@@ -260,10 +275,14 @@ export function tickPrices(): void {
     const nextCandle = buf[nextIdx];
     const lc         = _liveCandle[m.symbol];
 
+    // Trend bias: candle close relative to open tells us direction
+    const candleDir = nextCandle.close >= nextCandle.open ? 1 : -1;
+    const trendBias = candleDir * (nextCandle.high - nextCandle.low) * 0.08;
+
     // Smoothly build live candle tick-by-tick toward nextCandle's close
     const progress = tc / TICKS_PER_CANDLE;
-    const noise    = (nextCandle.high - nextCandle.low) * (Math.random() - 0.5) * 4.0; // extreme noise
-    let tickMove   = lc.open + (nextCandle.close - lc.open) * Math.min(progress, 1) + noise;
+    const noise    = (nextCandle.high - nextCandle.low) * (Math.random() - 0.5) * 5.0; // extreme noise
+    let tickMove   = lc.open + (nextCandle.close - lc.open) * Math.min(progress, 1) + noise + trendBias;
 
     // Frequent sharp spikes (25% chance)
     if (Math.random() < 0.25) {
