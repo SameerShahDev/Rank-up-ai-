@@ -7,6 +7,8 @@ export const isSupabaseConfigured = Boolean(
   url && anonKey && !url.includes('YOUR_PROJECT'),
 );
 
+console.log('[Supabase] Configured:', isSupabaseConfigured, '| URL:', url?.substring(0, 40) + '...');
+
 export const supabase: SupabaseClient | null = isSupabaseConfigured
   ? createClient(url!, anonKey!)
   : null;

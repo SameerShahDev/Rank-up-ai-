@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { X, Check, Smartphone, Loader2, ExternalLink, AlertCircle, RefreshCw, Phone } from 'lucide-react';
+import { X, Check, Smartphone, Loader2, ExternalLink, AlertCircle, RefreshCw, Phone, Shield, Zap, Clock } from 'lucide-react';
 import {
   generatePayboltOrderId,
   isPayboltConfigured,
@@ -20,7 +20,7 @@ interface DepositModalProps {
   onPaymentSuccess: (amount: number, meta: { orderId: string; utr?: string }) => void | Promise<void>;
 }
 
-const PRESETS = ['500', '1000', '5000', '10000'];
+const PRESETS = ['100', '500', '1000', '2000', '5000', '10000'];
 const POLL_MS = 4000;
 
 function loadPending(): PendingDeposit | null {
@@ -193,12 +193,12 @@ const DepositModal: React.FC<DepositModalProps> = ({ onClose, customerMobile, se
       >
         <div className="w-12 h-1 bg-white/10 rounded-full mx-auto" />
         <div className="flex justify-between items-center">
-          <h2 className="text-lg font-black text-white uppercase">
-            {step === 'amount' && 'Deposit (Real)'}
+          <h2 className="text-xl font-black text-white uppercase tracking-tight">
+            {step === 'amount' && 'Deposit Funds'}
             {step === 'payment' && 'Pay via UPI'}
-            {step === 'verifying' && 'Confirming…'}
-            {step === 'success' && 'Deposit success'}
-            {step === 'error' && 'Payment failed'}
+            {step === 'verifying' && 'Confirming Payment…'}
+            {step === 'success' && 'Deposit Successful'}
+            {step === 'error' && 'Payment Failed'}
           </h2>
           <button type="button" onClick={handleClose} className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center">
             <X className="w-5 h-5 text-gray-400" />
@@ -206,63 +206,96 @@ const DepositModal: React.FC<DepositModalProps> = ({ onClose, customerMobile, se
         </div>
 
         {!isPayboltConfigured && step === 'amount' && (
-          <p className="text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
-            PayBolt keys missing. Add VITE_PAYBOLT_USER_TOKEN in .env and restart the app.
-          </p>
+          <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20">
+            <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-[12px] font-black text-amber-400 mb-1">Gateway Not Configured</p>
+              <p className="text-[11px] text-gray-300 font-bold">Add VITE_PAYBOLT_USER_TOKEN in .env and restart the app.</p>
+            </div>
+          </div>
         )}
 
         {error && step !== 'success' && (
-          <p className="text-[11px] text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 flex gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            {error}
-          </p>
+          <div className="flex items-start gap-3 p-4 rounded-2xl bg-red-500/10 border border-red-500/20">
+            <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+            <p className="text-[11px] text-red-400 font-bold">{error}</p>
+          </div>
         )}
 
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        {/* STEP: AMOUNT */}
+        {/* ═══════════════════════════════════════════════════════════════ */}
         {step === 'amount' && (
           <>
-            <p className="text-[11px] text-gray-400">
-              Pay with <span className="text-[#0fb359] font-bold">PayBolt UPI</span> — credited to Real balance after confirmation.
-            </p>
+            {/* Gateway Info */}
+            <div className="flex items-center gap-3 p-4 rounded-2xl bg-[#0fb359]/10 border border-[#0fb359]/20">
+              <Zap className="w-5 h-5 text-[#0fb359] shrink-0" />
+              <div>
+                <p className="text-[12px] font-black text-[#0fb359]">PayBolt UPI Gateway</p>
+                <p className="text-[10px] text-gray-400 font-bold">Instant credit after payment confirmation</p>
+              </div>
+            </div>
+
+            {/* Phone Input */}
             {customerMobile ? (
-              <p className="text-[10px] text-gray-500">Mobile: +91 {mobile}</p>
+              <div className="bg-[#161821] border border-white/5 rounded-2xl p-4">
+                <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Registered Mobile</p>
+                <p className="text-sm font-black text-white">+91 {mobile}</p>
+              </div>
             ) : (
-              <div className="flex items-center gap-2 bg-[#161821] border border-white/10 rounded-xl px-4 py-3 focus-within:border-blue-500">
-                <Phone className="w-4 h-4 text-gray-500 shrink-0" />
+              <div className="flex items-center gap-2 bg-[#161821] border border-white/10 rounded-2xl px-4 py-3 focus-within:border-blue-500">
+                <Phone className="w-5 h-5 text-gray-500 shrink-0" />
                 <span className="text-gray-400 font-bold text-sm">+91</span>
                 <input
                   type="tel"
                   inputMode="numeric"
                   maxLength={10}
-                  placeholder="Phone for UPI"
+                  placeholder="10-digit mobile number"
                   value={phoneInput}
                   onChange={e => setPhoneInput(e.target.value.replace(/\D/g, '').slice(0, 10))}
                   className="flex-1 bg-transparent text-sm font-bold outline-none tabular-nums"
                 />
               </div>
             )}
-            <div className="bg-[#2d2e3b] rounded-xl p-4 text-center">
-              <span className="text-2xl font-black text-[#ffb300]">₹</span>
+
+            {/* Amount Input */}
+            <div className="bg-[#2d2e3b] rounded-2xl p-5 text-center">
+              <span className="text-3xl font-black text-[#ffb300]">₹</span>
               <input
                 type="number"
                 min={1}
                 value={amount}
                 onChange={e => setAmount(e.target.value)}
                 placeholder="0"
-                className="w-full bg-transparent text-4xl font-black text-white text-center focus:outline-none mt-1"
+                className="w-full bg-transparent text-5xl font-black text-white text-center focus:outline-none mt-1"
               />
+              <p className="text-[10px] text-gray-500 mt-2">Minimum deposit: ₹1</p>
             </div>
-            <div className="grid grid-cols-4 gap-2">
+
+            {/* Preset Amounts */}
+            <div className="grid grid-cols-3 gap-2">
               {PRESETS.map(p => (
-                <button key={p} type="button" onClick={() => setAmount(p)} className="py-2 bg-[#2d2e3b] rounded-lg text-[10px] font-bold text-gray-400 hover:text-white">
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setAmount(p)}
+                  className={`py-3 rounded-xl text-sm font-bold transition-colors ${
+                    amount === p
+                      ? 'bg-[#0fb359] text-black'
+                      : 'bg-[#2d2e3b] text-gray-400 hover:text-white hover:bg-white/10'
+                  }`}
+                >
                   ₹{Number(p).toLocaleString('en-IN')}
                 </button>
               ))}
             </div>
+
+            {/* Deposit Button */}
             <button
               type="button"
               disabled={!amount || Number(amount) < 1 || loading}
               onClick={() => void handleCreateOrder()}
-              className="w-full py-4 bg-[#0fb359] rounded-xl font-black text-sm disabled:opacity-40 flex items-center justify-center gap-2"
+              className="w-full py-4 bg-[#0fb359] hover:bg-[#0da652] rounded-2xl font-black text-sm disabled:opacity-40 flex items-center justify-center gap-2 text-black transition-colors"
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
                 <>
@@ -271,86 +304,161 @@ const DepositModal: React.FC<DepositModalProps> = ({ onClose, customerMobile, se
                 </>
               )}
             </button>
+
+            {/* How it works */}
+            <div className="bg-[#161821] border border-white/5 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-blue-400" />
+                <span className="text-[11px] font-black text-blue-400 uppercase">How Deposit Works</span>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-6 rounded-full bg-[#0fb359]/20 flex items-center justify-center shrink-0">
+                    <span className="text-[9px] font-black text-[#0fb359]">1</span>
+                  </div>
+                  <p className="text-[11px] text-gray-400 font-bold">Enter amount and your UPI-linked mobile number</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-6 rounded-full bg-[#0fb359]/20 flex items-center justify-center shrink-0">
+                    <span className="text-[9px] font-black text-[#0fb359]">2</span>
+                  </div>
+                  <p className="text-[11px] text-gray-400 font-bold">Complete payment on the UPI page</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-6 rounded-full bg-[#0fb359]/20 flex items-center justify-center shrink-0">
+                    <span className="text-[9px] font-black text-[#0fb359]">3</span>
+                  </div>
+                  <p className="text-[11px] text-gray-400 font-bold">Balance credits automatically within seconds</p>
+                </div>
+              </div>
+            </div>
           </>
         )}
 
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        {/* STEP: PAYMENT */}
+        {/* ═══════════════════════════════════════════════════════════════ */}
         {step === 'payment' && (
           <>
-            <p className="text-center text-xl font-black">₹{Number(amount).toLocaleString('en-IN')}</p>
-            <p className="text-[11px] text-gray-400 text-center">Order: {orderId}</p>
+            <div className="text-center bg-[#2d2e3b] rounded-2xl p-5">
+              <p className="text-3xl font-black text-white font-mono">₹{Number(amount).toLocaleString('en-IN')}</p>
+              <p className="text-[10px] text-gray-500 mt-1">Order: {orderId}</p>
+            </div>
+
             <button
               type="button"
               onClick={openPayment}
-              className="w-full py-4 bg-[#0fb359] rounded-xl font-black text-sm flex items-center justify-center gap-2"
+              className="w-full py-4 bg-[#0fb359] hover:bg-[#0da652] rounded-2xl font-black text-sm flex items-center justify-center gap-2 text-black transition-colors"
             >
               <ExternalLink className="w-5 h-5" />
-              Open payment page
+              Open UPI Payment Page
             </button>
+
             {paymentUrl && (
-              <iframe
-                title="PayBolt payment"
-                src={paymentUrl}
-                className="w-full h-64 rounded-xl border border-white/10 bg-white"
-                sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-top-navigation"
-              />
+              <div className="rounded-2xl overflow-hidden border border-white/10">
+                <iframe
+                  title="PayBolt payment"
+                  src={paymentUrl}
+                  className="w-full h-64 bg-white"
+                  sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-top-navigation"
+                />
+              </div>
             )}
+
             <p className="text-[10px] text-gray-500 text-center">
-              Complete UPI payment in the page above or new tab. Balance updates automatically when paid.
+              Complete UPI payment in the page above or new tab. Balance updates automatically.
             </p>
+
             <button
               type="button"
               disabled={loading}
               onClick={() => void handleVerifyNow()}
-              className="w-full py-3 bg-[#2d2e3b] rounded-xl font-bold text-sm flex items-center justify-center gap-2"
+              className="w-full py-4 bg-[#2d2e3b] hover:bg-white/10 rounded-2xl font-black text-sm flex items-center justify-center gap-2 transition-colors"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-              I have paid — check status
+              I have paid — Check status
             </button>
+
             <button type="button" onClick={() => setStep('amount')} className="w-full py-2 text-gray-500 text-xs font-bold">
               Change amount
             </button>
           </>
         )}
 
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        {/* STEP: VERIFYING */}
+        {/* ═══════════════════════════════════════════════════════════════ */}
         {step === 'verifying' && (
-          <div className="text-center py-8 space-y-4">
-            <Loader2 className="w-12 h-12 text-[#0fb359] mx-auto animate-spin" />
-            <p className="text-sm text-gray-300">Waiting for payment confirmation…</p>
-            <p className="text-[10px] text-gray-500">Order {orderId}</p>
+          <div className="text-center py-10 space-y-5">
+            <Loader2 className="w-16 h-16 text-[#0fb359] mx-auto animate-spin" />
+            <div>
+              <p className="text-lg font-black text-white mb-1">Waiting for payment…</p>
+              <p className="text-[11px] text-gray-400 font-bold">Order: {orderId}</p>
+            </div>
             <button
               type="button"
               disabled={loading}
               onClick={() => void handleVerifyNow()}
-              className="w-full py-3 bg-[#2d2e3b] rounded-xl font-bold text-sm"
+              className="w-full py-4 bg-[#2d2e3b] hover:bg-white/10 rounded-2xl font-black text-sm transition-colors"
             >
               Check again
             </button>
           </div>
         )}
 
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        {/* STEP: SUCCESS */}
+        {/* ═══════════════════════════════════════════════════════════════ */}
         {step === 'success' && (
-          <div className="text-center py-6 space-y-4">
-            <Check className="w-12 h-12 text-[#0fb359] mx-auto" />
-            <p className="text-2xl font-black">₹{Number(amount).toLocaleString('en-IN')}</p>
-            <p className="text-[11px] text-gray-400 uppercase font-bold">Added to real balance</p>
-            {utr && <p className="text-[10px] text-gray-500">UTR: {utr}</p>}
-            <button type="button" onClick={handleClose} className="w-full py-3 bg-[#2d2e3b] rounded-xl font-bold">Done</button>
+          <div className="text-center py-8 space-y-5">
+            <div className="w-20 h-20 mx-auto rounded-full bg-[#0fb359]/20 border-2 border-[#0fb359]/30 flex items-center justify-center">
+              <Check className="w-10 h-10 text-[#0fb359]" />
+            </div>
+            <div>
+              <p className="text-3xl font-black text-white font-mono mb-1">₹{Number(amount).toLocaleString('en-IN')}</p>
+              <p className="text-[12px] text-[#0fb359] font-black uppercase">Added to Real Balance</p>
+            </div>
+            {utr && (
+              <div className="bg-[#161821] border border-white/5 rounded-2xl p-3">
+                <p className="text-[10px] text-gray-500">UTR: {utr}</p>
+              </div>
+            )}
+            <button type="button" onClick={handleClose} className="w-full py-4 bg-[#2d2e3b] rounded-2xl font-black text-sm">
+              Done
+            </button>
           </div>
         )}
 
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        {/* STEP: ERROR */}
+        {/* ═══════════════════════════════════════════════════════════════ */}
         {step === 'error' && (
-          <div className="text-center py-6 space-y-4">
-            <AlertCircle className="w-12 h-12 text-red-400 mx-auto" />
-            <p className="text-sm text-red-400 font-bold">{error || 'Payment failed'}</p>
-            <button type="button" onClick={() => { setStep('amount'); setError(''); }} className="w-full py-3 bg-[#2d2e3b] rounded-xl font-bold">
+          <div className="text-center py-8 space-y-5">
+            <div className="w-20 h-20 mx-auto rounded-full bg-red-500/20 border-2 border-red-500/30 flex items-center justify-center">
+              <AlertCircle className="w-10 h-10 text-red-400" />
+            </div>
+            <div>
+              <p className="text-lg font-black text-white mb-1">Payment Failed</p>
+              <p className="text-[11px] text-red-400 font-bold">{error || 'Something went wrong'}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setStep('amount'); setError(''); }}
+              className="w-full py-4 bg-[#2d2e3b] hover:bg-white/10 rounded-2xl font-black text-sm transition-colors"
+            >
               Try again
             </button>
           </div>
         )}
+
+        {/* Security Footer */}
+        <div className="flex items-center justify-center gap-2 py-2 opacity-40">
+          <Shield className="w-3.5 h-3.5 text-blue-500" />
+          <span className="text-[9px] font-black uppercase tracking-wider text-gray-500">Encrypted · Secure gateway</span>
+        </div>
       </div>
     </div>
   );
 };
 
 export default DepositModal;
-

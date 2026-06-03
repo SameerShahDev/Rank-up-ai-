@@ -53,34 +53,50 @@ function mockLogin(email: string, password: string): { success: boolean; profile
 }
 
 export async function registerUser(email: string, password: string) {
-  if (!isSupabaseConfigured || !supabase) return mockRegister(email, password);
+  if (!isSupabaseConfigured || !supabase) {
+    console.warn('[Auth] Supabase not configured — using mock register');
+    return mockRegister(email, password);
+  }
 
+  console.log('[Auth] Calling register_user RPC...');
   const { data, error } = await supabase.rpc('register_user', {
     p_email: email,
     p_password: password,
   });
-  if (error) return { success: false, error: error.message };
+  if (error) {
+    console.error('[Auth] register_user RPC error:', error.message);
+    return { success: false, error: error.message };
+  }
   const r = data as Record<string, unknown>;
   if (!r.success) return { success: false, error: String(r.error ?? 'Registration failed') };
   const profile = mapProfile(r);
   localStorage.setItem(SESSION_KEY, profile.sessionToken);
   localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+  console.log('[Auth] Register OK:', profile.email);
   return { success: true, profile };
 }
 
 export async function loginUser(email: string, password: string) {
-  if (!isSupabaseConfigured || !supabase) return mockLogin(email, password);
+  if (!isSupabaseConfigured || !supabase) {
+    console.warn('[Auth] Supabase not configured — using mock login');
+    return mockLogin(email, password);
+  }
 
+  console.log('[Auth] Calling login_user RPC...');
   const { data, error } = await supabase.rpc('login_user', {
     p_email: email,
     p_password: password,
   });
-  if (error) return { success: false, error: error.message };
+  if (error) {
+    console.error('[Auth] login_user RPC error:', error.message);
+    return { success: false, error: error.message };
+  }
   const r = data as Record<string, unknown>;
   if (!r.success) return { success: false, error: String(r.error ?? 'Login failed') };
   const profile = mapProfile(r);
   localStorage.setItem(SESSION_KEY, profile.sessionToken);
   localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+  console.log('[Auth] Login OK:', profile.email);
   return { success: true, profile };
 }
 
@@ -112,19 +128,28 @@ export async function updateDisplayName(sessionToken: string, name: string) {
 
 export async function loadSessionProfile(): Promise<UserProfile | null> {
   const token = localStorage.getItem(SESSION_KEY);
-  if (!token) return null;
+  if (!token) {
+    console.log('[Auth] No session token in localStorage');
+    return null;
+  }
 
   const cached = localStorage.getItem(PROFILE_KEY);
   if (!isSupabaseConfigured || !supabase) {
+    console.warn('[Auth] Supabase not configured — using cached profile');
     return cached ? JSON.parse(cached) : null;
   }
 
+  console.log('[Auth] Loading profile from Supabase...');
   const { data, error } = await supabase.rpc('get_profile_by_session', {
     p_session_token: token,
   });
-  if (error || !data) return cached ? JSON.parse(cached) : null;
+  if (error || !data) {
+    console.warn('[Auth] Session load failed, using cache:', error?.message ?? 'no data');
+    return cached ? JSON.parse(cached) : null;
+  }
   const r = data as Record<string, unknown>;
   if (!r.success) {
+    console.warn('[Auth] Session invalid — clearing localStorage');
     localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(PROFILE_KEY);
     return null;
@@ -139,6 +164,7 @@ export async function loadSessionProfile(): Promise<UserProfile | null> {
     needsName: Boolean(r.needs_name),
   };
   localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+  console.log('[Auth] Session OK:', profile.email);
   return profile;
 }
 

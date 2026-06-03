@@ -30,8 +30,10 @@ const AuthFlow: React.FC<AuthFlowProps> = ({ onComplete }) => {
     }
     setLoading(true);
     const fn = mode === 'signup' ? registerUser : loginUser;
+    console.log(`[Auth] ${mode === 'signup' ? 'Registering' : 'Logging in'}:`, email.trim());
     const res = await fn(email.trim(), password);
     setLoading(false);
+    console.log('[Auth] Result:', res.success ? 'OK' : res.error, res.profile);
     if (!res.success || !res.profile) {
       setError(res.error ?? 'Something went wrong');
       return;
@@ -63,7 +65,7 @@ const AuthFlow: React.FC<AuthFlowProps> = ({ onComplete }) => {
     });
   };
 
-  if (profile && displayName !== undefined) {
+  if (profile && profile.needsName) {
     return (
       <div className="min-h-[100dvh] bg-[#0a0b0f] text-white flex flex-col items-center justify-center px-4 relative overflow-hidden font-space">
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-72 h-72 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />

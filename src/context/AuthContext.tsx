@@ -105,11 +105,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [profile]);
 
   useEffect(() => {
+    console.log('[AuthContext] Loading session...');
     loadSessionProfile().then(p => {
       if (p) {
+        console.log('[AuthContext] Session loaded:', p.email, '| needsName:', p.needsName);
         setProfile(p);
         setDemoBalance(p.demoBalance);
         setRealBalance(p.realBalance);
+      } else {
+        console.log('[AuthContext] No session found');
       }
       setIsLoading(false);
     });
