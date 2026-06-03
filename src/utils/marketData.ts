@@ -22,7 +22,6 @@ export interface Market {
 
 // ─── Real April–May 2026 price seeds ─────────────────────────────────────
 const PRICE_SEEDS: Record<string, { start: number; end: number; lo: number; hi: number }> = {
-  // Crypto in INR (1 USD ≈ ₹83.5)
   'BTC/INR':       { start: 6162300, end: 6696700, lo: 6012000,  hi: 6847000  },
   'ETH/INR':       { start: 171175,  end: 189545,  lo: 165330,   hi: 208750   },
   'BNB/INR':       { start: 51352,   end: 55778,   lo: 49683,    hi: 57615    },
@@ -33,10 +32,8 @@ const PRICE_SEEDS: Record<string, { start: number; end: number; lo: number; hi: 
   'AVAX/INR':      { start: 1795,    end: 2237,    lo: 1587,     hi: 2547    },
   'DOGE/INR':      { start: 15.2,    end: 17.9,    lo: 13.8,     hi: 20.5    },
   'MATIC/INR':     { start: 31.7,    end: 36.7,    lo: 27.6,     hi: 43.4    },
-  // Commodities in INR
   'GOLD/INR':      { start: 248930,  end: 269705,  lo: 245490,   hi: 272210  },
   'SILVER/INR':    { start: 2630,    end: 2739,    lo: 2522,     hi: 2881    },
-  // Stocks in INR
   'APPLE/INR':     { start: 17368,   end: 17952,   lo: 16867,    hi: 18370   },
   'TATA/INR':      { start: 780,     end: 820,     lo: 755,      hi: 855     },
   'RELIANCE/INR':  { start: 1310,    end: 1380,    lo: 1280,     hi: 1420    },
@@ -61,20 +58,17 @@ export const MARKETS: Market[] = [
 ];
 
 // ─── Core candle generator ────────────────────────────────────────────────
-// Generates `count` candles continuing from `fromPrice`
-// Stays within [lo*0.9, hi*1.1] range, realistic GBM
 function generateCandles(symbol: string, fromPrice: number, count: number, startTime: number): Candle[] {
-  const seed      = PRICE_SEEDS[symbol];
-  const interval  = 4 * 60 * 60 * 1000; // 4H
+  const seed       = PRICE_SEEDS[symbol];
+  const interval   = 4 * 60 * 60 * 1000; // 4H
   const priceRange = seed.hi - seed.lo;
-  const volatility = priceRange * 0.055; // 5.5% of range per 4H candle — more realistic up/down
+  const volatility = priceRange * 0.055;
 
   const candles: Candle[] = [];
   let price = fromPrice;
 
   for (let i = 0; i < count; i++) {
     const open   = price;
-    // Mean-reversion nudge: drift slightly back toward mid if out of range
     const mid    = (seed.hi + seed.lo) / 2;
     const revert = (mid - price) * 0.02;
     const change = (Math.random() - 0.48) * volatility + revert;
@@ -98,44 +92,138 @@ function generateCandles(symbol: string, fromPrice: number, count: number, start
   return candles;
 }
 
-// ─── Infinite rolling buffer (max 360 candles = 60 days) ─────────────────
-const INITIAL_COUNT  = 180; // 30 days initial history
-const EXTEND_TRIGGER = 20;  // extend when < 20 candles left ahead
-const EXTEND_BATCH   = 60;  // add 60 new candles (10 days) at a time
-const MAX_BUFFER     = 360; // keep max 360 candles in memory
+// ─── Rolling buffer constants ─────────────────────────────────────────────
+const INITIAL_COUNT  = 180;
+const EXTEND_TRIGGER = 20;
+const EXTEND_BATCH   = 60;
+const MAX_BUFFER     = 360;
+const CANDLE_INTERVAL = 4 * 60 * 60 * 1000; // 4H
 
-// buffer[symbol] is always sorted oldest→newest
-const _buffer: Record<string, Candle[]>  = {};
-const _headIdx: Record<string, number>   = {}; // current playback position in buffer
-const _liveCandle: Record<string, Candle> = {};
-const _tickCount: Record<string, number>  = {};
-const TICKS_PER_CANDLE = 10; // 10 × 600ms = 6 sec per candle → smoother, more realistic movement
+// ─── Internal state ───────────────────────────────────────────────────────
+const _buffer:     Record<string, Candle[]>  = {};
+const _headIdx:    Record<string, number>    = {};
+const _liveCandle: Record<string, Candle>    = {};
+const _tickCount:  Record<string, number>    = {};
+const TICKS_PER_CANDLE = 10;
 
-// Init all markets
+// ─── localStorage persistence ─────────────────────────────────────────────
+const STORAGE_PREFIX = 'tryonetrade_market_';
+const SAVE_THROTTLE_MS = 30000; // save every 30s max
+let _lastSaveTime = 0;
+
+interface SavedState {
+  buffer: Candle[];
+  headIdx: number;
+  liveCandle: Candle;
+  tickCount: number;
+  lastSaved: number;
+}
+
+function storageKey(symbol: string): string {
+  return STORAGE_PREFIX + symbol.replace('/', '_');
+}
+
+function saveMarketState(symbol: string): void {
+  try {
+    const state: SavedState = {
+      buffer: _buffer[symbol],
+      headIdx: _headIdx[symbol],
+      liveCandle: _liveCandle[symbol],
+      tickCount: _tickCount[symbol],
+      lastSaved: Date.now(),
+    };
+    localStorage.setItem(storageKey(symbol), JSON.stringify(state));
+  } catch {
+    // localStorage full or blocked — silently ignore
+  }
+}
+
+function loadMarketState(symbol: string): SavedState | null {
+  try {
+    const raw = localStorage.getItem(storageKey(symbol));
+    if (!raw) return null;
+    const state = JSON.parse(raw) as SavedState;
+    if (!state.buffer || !state.liveCandle || typeof state.headIdx !== 'number') return null;
+    return state;
+  } catch {
+    return null;
+  }
+}
+
+// ─── Generate candles to fill gap when page was closed ────────────────────
+function fillTimeGap(symbol: string, lastSaved: number, now: number): void {
+  const gapMs = now - lastSaved;
+  const gapCandles = Math.floor(gapMs / CANDLE_INTERVAL);
+
+  if (gapCandles < 1) return;
+
+  const buf  = _buffer[symbol];
+  const maxGap = Math.min(gapCandles, 200); // cap at ~33 hours to prevent crazy generation
+  const lastCandle = buf[buf.length - 1];
+
+  const newCandles = generateCandles(symbol, lastCandle.close, maxGap, lastCandle.time + CANDLE_INTERVAL);
+  buf.push(...newCandles);
+
+  // Advance head by gap candles (simulate that market kept running)
+  _headIdx[symbol] = Math.min(buf.length - 2, _headIdx[symbol] + maxGap);
+
+  // Set live candle from new position
+  const head = _headIdx[symbol];
+  _liveCandle[symbol] = { ...buf[head] };
+
+  // Trim if buffer too large
+  if (buf.length > MAX_BUFFER) {
+    const trim = buf.length - MAX_BUFFER;
+    buf.splice(0, trim);
+    _headIdx[symbol] = Math.max(0, _headIdx[symbol] - trim);
+  }
+}
+
+// ─── Init all markets ─────────────────────────────────────────────────────
+const now = Date.now();
+
 MARKETS.forEach(m => {
-  const now  = Date.now();
-  const seed = PRICE_SEEDS[m.symbol];
-  const startTime = now - INITIAL_COUNT * 4 * 60 * 60 * 1000;
+  const saved = loadMarketState(m.symbol);
 
-  _buffer[m.symbol]    = generateCandles(m.symbol, seed.start, INITIAL_COUNT, startTime);
-  _headIdx[m.symbol]   = INITIAL_COUNT - 2; // start near end of initial history
-  _liveCandle[m.symbol] = { ..._buffer[m.symbol][INITIAL_COUNT - 1] };
-  _tickCount[m.symbol]  = 0;
+  if (saved && saved.buffer.length > 0) {
+    // Restore from localStorage
+    _buffer[m.symbol]    = saved.buffer;
+    _headIdx[m.symbol]   = saved.headIdx;
+    _liveCandle[m.symbol] = saved.liveCandle;
+    _tickCount[m.symbol]  = saved.tickCount;
+
+    // Fill gap if page was closed for a while
+    fillTimeGap(m.symbol, saved.lastSaved, now);
+
+    console.log(`[Market] Restored ${m.symbol} from localStorage (head: ${_headIdx[m.symbol]}, buffer: ${_buffer[m.symbol].length})`);
+  } else {
+    // Fresh generate
+    const seed      = PRICE_SEEDS[m.symbol];
+    const startTime = now - INITIAL_COUNT * CANDLE_INTERVAL;
+
+    _buffer[m.symbol]     = generateCandles(m.symbol, seed.start, INITIAL_COUNT, startTime);
+    _headIdx[m.symbol]    = INITIAL_COUNT - 2;
+    _liveCandle[m.symbol] = { ..._buffer[m.symbol][INITIAL_COUNT - 1] };
+    _tickCount[m.symbol]  = 0;
+
+    // Save initial state
+    saveMarketState(m.symbol);
+
+    console.log(`[Market] Generated fresh ${m.symbol}`);
+  }
 });
 
-// Extend buffer seamlessly from last close — never resets to day 1
+// ─── Extend buffer seamlessly ─────────────────────────────────────────────
 function maybeExtend(symbol: string): void {
   const buf  = _buffer[symbol];
   const head = _headIdx[symbol];
   const remaining = buf.length - 1 - head;
 
   if (remaining < EXTEND_TRIGGER) {
-    // Generate new candles continuing from the last candle's close
-    const lastCandle  = buf[buf.length - 1];
-    const newCandles  = generateCandles(symbol, lastCandle.close, EXTEND_BATCH, lastCandle.time + 4 * 60 * 60 * 1000);
+    const lastCandle = buf[buf.length - 1];
+    const newCandles = generateCandles(symbol, lastCandle.close, EXTEND_BATCH, lastCandle.time + CANDLE_INTERVAL);
     buf.push(...newCandles);
 
-    // Trim old candles if buffer too large
     if (buf.length > MAX_BUFFER) {
       const trim = buf.length - MAX_BUFFER;
       buf.splice(0, trim);
@@ -156,7 +244,6 @@ export function getLiveCandles(symbol: string, count = 60): Candle[] {
   return [...buf.slice(start, head + 1), { ..._liveCandle[symbol] }];
 }
 
-// Legacy compat (kept for any imports)
 export function getCandles(symbol: string): Candle[] {
   return _buffer[symbol] ?? [];
 }
@@ -168,19 +255,19 @@ export function tickPrices(): void {
     _tickCount[m.symbol]++;
     const tc = _tickCount[m.symbol];
 
-    const head      = _headIdx[m.symbol];
-    const nextIdx   = Math.min(head + 1, buf.length - 1);
+    const head       = _headIdx[m.symbol];
+    const nextIdx    = Math.min(head + 1, buf.length - 1);
     const nextCandle = buf[nextIdx];
-    const lc        = _liveCandle[m.symbol];
+    const lc         = _liveCandle[m.symbol];
 
     // Smoothly build live candle tick-by-tick toward nextCandle's close
     const progress = tc / TICKS_PER_CANDLE;
     const noise    = (nextCandle.high - nextCandle.low) * (Math.random() - 0.5) * 0.4;
-    let tickMove = lc.open + (nextCandle.close - lc.open) * Math.min(progress, 1) + noise;
+    let tickMove   = lc.open + (nextCandle.close - lc.open) * Math.min(progress, 1) + noise;
 
-    // Occasional sharp spike (1.5% chance per tick)
+    // Occasional sharp spike (1.5% chance)
     if (Math.random() < 0.015) {
-      const spikeDir = Math.random() > 0.5 ? 1 : -1;
+      const spikeDir  = Math.random() > 0.5 ? 1 : -1;
       const spikeSize = nextCandle.close * (0.002 + Math.random() * 0.006);
       tickMove += spikeDir * spikeSize;
     }
@@ -189,14 +276,14 @@ export function tickPrices(): void {
     lc.high  = Math.max(lc.high, lc.close);
     lc.low   = Math.min(lc.low,  lc.close);
 
-    // Candle complete — advance head, open new live candle
+    // Candle complete — advance head
     if (tc >= TICKS_PER_CANDLE) {
       _tickCount[m.symbol] = 0;
 
-      // Commit completed live candle into buffer at head position
+      // Commit completed live candle
       buf[head] = { ...lc, time: lc.time };
 
-      // Move head forward (never loops back — always advances)
+      // Move head forward
       _headIdx[m.symbol] = nextIdx;
 
       const newBase = nextCandle.close;
@@ -209,8 +296,14 @@ export function tickPrices(): void {
         volume: nextCandle.volume,
       };
 
-      // Pre-extend buffer so we never run out
       maybeExtend(m.symbol);
     }
   });
+
+  // Throttled save to localStorage
+  const tickNow = Date.now();
+  if (tickNow - _lastSaveTime >= SAVE_THROTTLE_MS) {
+    _lastSaveTime = tickNow;
+    MARKETS.forEach(m => saveMarketState(m.symbol));
+  }
 }

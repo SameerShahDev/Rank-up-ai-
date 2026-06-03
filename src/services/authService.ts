@@ -197,14 +197,19 @@ export async function loadUserProfile(): Promise<UserProfile | null> {
     return mockLoadProfile();
   }
 
-  const { data, error } = await supabase.rpc('get_my_profile');
-  if (error || !data) {
-    console.warn('[Auth] Profile load failed:', error?.message ?? 'no data');
+  try {
+    const { data, error } = await supabase.rpc('get_my_profile');
+    if (error || !data) {
+      console.warn('[Auth] Profile load failed:', error?.message ?? 'no data');
+      return null;
+    }
+    const r = data as Record<string, unknown>;
+    if (!r.success) return null;
+    return mapProfile(r);
+  } catch (e) {
+    console.error('[Auth] loadUserProfile exception:', e);
     return null;
   }
-  const r = data as Record<string, unknown>;
-  if (!r.success) return null;
-  return mapProfile(r);
 }
 
 export async function getCurrentSession(): Promise<UserProfile | null> {
@@ -212,24 +217,29 @@ export async function getCurrentSession(): Promise<UserProfile | null> {
     return mockLoadProfile();
   }
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    console.log('[Auth] No active session');
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.log('[Auth] No active session');
+      return null;
+    }
+
+    console.log('[Auth] Active session for:', user.email);
+    const profile = await loadUserProfile();
+    if (profile) return profile;
+
+    // Fallback
+    return {
+      profileId: user.id,
+      email: user.email ?? '',
+      displayName: (user.user_metadata?.display_name as string) ?? null,
+      demoBalance: 10000,
+      realBalance: 0,
+    };
+  } catch (e) {
+    console.error('[Auth] getCurrentSession error:', e);
     return null;
   }
-
-  console.log('[Auth] Active session for:', user.email);
-  const profile = await loadUserProfile();
-  if (profile) return profile;
-
-  // Fallback
-  return {
-    profileId: user.id,
-    email: user.email ?? '',
-    displayName: (user.user_metadata?.display_name as string) ?? null,
-    demoBalance: 10000,
-    realBalance: 0,
-  };
 }
 
 export async function updateDisplayName(name: string) {

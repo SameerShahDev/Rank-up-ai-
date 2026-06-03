@@ -77,12 +77,16 @@ export async function fetchAccountDashboard(): Promise<AccountDashboard | null> 
     };
   }
 
-  const { data, error } = await supabase.rpc('get_my_account_dashboard');
-
-  if (error || !data) return null;
-  const r = data as Record<string, unknown>;
-  if (!r.success) return null;
-  return mapDashboard(r);
+  try {
+    const { data, error } = await supabase.rpc('get_my_account_dashboard');
+    if (error || !data) return null;
+    const r = data as Record<string, unknown>;
+    if (!r.success) return null;
+    return mapDashboard(r);
+  } catch (e) {
+    console.error('[Settings] fetchAccountDashboard error:', e);
+    return null;
+  }
 }
 
 export async function saveUserSettings(

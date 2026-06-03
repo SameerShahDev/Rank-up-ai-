@@ -107,17 +107,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // ─── Load session on mount ───────────────────────────────────────────
   useEffect(() => {
     console.log('[AuthContext] Loading session...');
-    getCurrentSession().then(p => {
-      if (p) {
-        console.log('[AuthContext] Session loaded:', p.email);
-        setProfile(p);
-        setDemoBalance(p.demoBalance);
-        setRealBalance(p.realBalance);
-      } else {
-        console.log('[AuthContext] No session found');
-      }
-      setIsLoading(false);
-    });
+    getCurrentSession()
+      .then(p => {
+        if (p) {
+          console.log('[AuthContext] Session loaded:', p.email);
+          setProfile(p);
+          setDemoBalance(p.demoBalance);
+          setRealBalance(p.realBalance);
+        } else {
+          console.log('[AuthContext] No session found');
+        }
+      })
+      .catch(e => {
+        console.error('[AuthContext] Session load error:', e);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   }, []);
 
   // ─── Listen for auth state changes (Google OAuth redirect, etc.) ─────
