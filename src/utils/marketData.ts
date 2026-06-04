@@ -130,18 +130,18 @@ function generateCandles(symbol: string, fromPrice: number, count: number, start
 }
 
 // ─── Rolling buffer constants ─────────────────────────────────────────────
-const INITIAL_COUNT  = 180;
-const EXTEND_TRIGGER = 20;
-const EXTEND_BATCH   = 60;
-const MAX_BUFFER     = 360;
-const CANDLE_INTERVAL = 4 * 60 * 60 * 1000; // 4H
+const INITIAL_COUNT  = 240; // 4 hours of history
+const EXTEND_TRIGGER = 30;
+const EXTEND_BATCH   = 90;
+const MAX_BUFFER     = 480;
+const CANDLE_INTERVAL = 60 * 1000; // 1m
 
 // ─── Internal state ───────────────────────────────────────────────────────
 const _buffer:     Record<string, Candle[]>  = {};
 const _headIdx:    Record<string, number>    = {};
 const _liveCandle: Record<string, Candle>    = {};
 const _tickCount:  Record<string, number>    = {};
-const TICKS_PER_CANDLE = 8; // 8 × 400ms = 3.2 sec per candle — smooth, readable
+const TICKS_PER_CANDLE = 60; // 60 × 1000ms = 60s per candle — smooth minute candle
 
 // ─── localStorage persistence ─────────────────────────────────────────────
 const STORAGE_PREFIX = 'tryonetrade_market_';
