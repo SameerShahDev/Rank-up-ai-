@@ -243,7 +243,7 @@ function AppShell() {
         )}
 
         <main className={`flex-1 relative overflow-y-auto scrollbar-hide transition-all ${isTransitioning ? 'opacity-0 scale-98' : 'opacity-100'} ${activeTab === 'send' ? 'pb-[68px] overflow-hidden sm:pb-[72px]' : 'pb-[80px] sm:pb-[90px]'}`}>
-          <div className={`h-full w-full mx-auto ${activeTab === 'send' ? '' : 'max-w-7xl'}`}>
+          <div className={`h-full w-full mx-auto ${activeTab === 'send' ? 'max-w-full md:max-w-2xl lg:max-w-3xl xl:max-w-4xl' : 'max-w-7xl'}`}>
             {renderContent()}
           </div>
         </main>

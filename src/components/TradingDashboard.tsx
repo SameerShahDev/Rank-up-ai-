@@ -43,7 +43,7 @@ const SYMBOL_MAP: Record<string, string> = {
   SOL: 'SOL/INR',
 };
 
-/* ─── Professional Candlestick Chart ─────────────────────────────────── */
+/* ─── Realistic Candlestick Chart (TradingView/Binance style) ─────────── */
 const CandlestickChart = ({
   candles,
   livePrice,
@@ -73,76 +73,67 @@ const CandlestickChart = ({
     ctx.scale(dpr, dpr);
     const W = rect.width;
     const H = rect.height;
-    const pad = { top: 16, right: 62, bottom: 28, left: 10 };
+    const pad = { top: 12, right: 58, bottom: 24, left: 8 };
     const plotW = W - pad.left - pad.right;
     const plotH = H - pad.top - pad.bottom;
 
-    /* ── Background ────────────────────────────────────────────── */
-    const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
-    bgGrad.addColorStop(0, '#111827');
-    bgGrad.addColorStop(0.5, '#0f1420');
-    bgGrad.addColorStop(1, '#0b0f1a');
-    ctx.fillStyle = bgGrad;
+    /* ── Background — deep trading terminal ────────────────────── */
+    ctx.fillStyle = '#0d1117';
     ctx.fillRect(0, 0, W, H);
+
+    // Subtle top gradient
+    const topGrad = ctx.createLinearGradient(0, 0, 0, H * 0.4);
+    topGrad.addColorStop(0, 'rgba(30, 41, 59, 0.25)');
+    topGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = topGrad;
+    ctx.fillRect(0, 0, W, H * 0.4);
 
     if (candles.length < 1) return;
 
-    /* ── Price range ──────────────────────────────────────────── */
+    /* ── Price range — generous padding ───────────────────────── */
     const allHighs = candles.map(c => c.high);
     const allLows = candles.map(c => c.low);
     const maxP = Math.max(...allHighs, livePrice);
     const minP = Math.min(...allLows, livePrice);
     const range = maxP - minP || 1;
-    const padRange = range * 0.12;
+    const padRange = range * 0.08;
     const adjMax = maxP + padRange;
     const adjMin = minP - padRange;
     const adjRange = adjMax - adjMin;
 
     const toY = (p: number) => pad.top + ((adjMax - p) / adjRange) * plotH;
-    const barW = Math.max(2.5, Math.min(8, (plotW / candles.length) * 0.5));
-    const gap = plotW / candles.length;
+    const slot = plotW / candles.length;
+    // Realistic candle body width: ~72% of slot
+    const barW = Math.max(3, Math.min(12, slot * 0.72));
+    const gap = slot;
 
-    /* ── Grid — professional dotted style ──────────────────────── */
+    /* ── Horizontal grid — crisp solid lines ─────────────────── */
     const gridCount = 5;
     for (let i = 0; i <= gridCount; i++) {
       const y = pad.top + (plotH * i) / gridCount;
-      ctx.strokeStyle = 'rgba(148,163,184,0.06)';
+      ctx.strokeStyle = i === 0 || i === gridCount
+        ? 'rgba(148,163,184,0.08)'
+        : 'rgba(148,163,184,0.04)';
       ctx.lineWidth = 0.5;
-      ctx.setLineDash([1, 3]);
       ctx.beginPath();
       ctx.moveTo(pad.left, y);
       ctx.lineTo(W - pad.right, y);
       ctx.stroke();
     }
-    ctx.setLineDash([]);
 
+    /* ── Vertical grid — sparse and subtle ────────────────────── */
     const vStep = Math.max(1, Math.floor(candles.length / 6));
     for (let i = 0; i < candles.length; i += vStep) {
       const x = pad.left + (i + 0.5) * gap;
-      ctx.strokeStyle = 'rgba(148,163,184,0.04)';
+      ctx.strokeStyle = 'rgba(148,163,184,0.03)';
       ctx.lineWidth = 0.5;
-      ctx.setLineDash([1, 4]);
       ctx.beginPath();
       ctx.moveTo(x, pad.top);
       ctx.lineTo(x, pad.top + plotH);
       ctx.stroke();
     }
-    ctx.setLineDash([]);
 
-    /* ── Volume bars ───────────────────────────────────────────── */
-    const maxVol = Math.max(...candles.map(c => c.volume || 0), 1);
-    const volH = plotH * 0.12;
-    const volTop = pad.top + plotH - volH;
-    candles.forEach((c, i) => {
-      const x = pad.left + (i + 0.5) * gap;
-      const isUp = c.close >= c.open;
-      const vH = ((c.volume || 0) / maxVol) * volH;
-      const volColor = isUp ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)';
-      ctx.fillStyle = volColor;
-      ctx.fillRect(x - barW / 2, volTop + volH - vH, barW, vH);
-    });
-
-    /* ── Moving averages ───────────────────────────────────────── */
+    /* ── Moving averages (rendered behind candles) ────────────── */
     const calcMA = (period: number) => {
       const result: (number | null)[] = [];
       for (let i = 0; i < candles.length; i++) {
@@ -154,10 +145,9 @@ const CandlestickChart = ({
       return result;
     };
 
-    const drawMA = (period: number, color: string, alpha: number) => {
+    const drawMA = (period: number, color: string) => {
       const ma = calcMA(period);
       ctx.strokeStyle = color;
-      ctx.globalAlpha = alpha;
       ctx.lineWidth = 1;
       ctx.beginPath();
       let started = false;
@@ -169,175 +159,124 @@ const CandlestickChart = ({
         else ctx.lineTo(x, y);
       });
       ctx.stroke();
-      ctx.globalAlpha = 1;
     };
 
-    drawMA(7, '#f59e0b', 0.5);
-    drawMA(25, '#8b5cf6', 0.35);
+    drawMA(7, 'rgba(245, 158, 11, 0.55)');
+    drawMA(25, 'rgba(139, 92, 246, 0.4)');
 
-    /* ── Candles — anti-aliased with gradient fills ─────────────── */
+    /* ── Candles — Binance/TradingView realistic style ────────── */
+    // Bull (up): #26a69a solid filled
+    // Bear (down): #ef5354 solid filled
+    const bullColor = '#26a69a';
+    const bearColor = '#ef5354';
+    const bullWick = '#26a69a';
+    const bearWick = '#ef5354';
+
     candles.forEach((c, i) => {
       const x = pad.left + (i + 0.5) * gap;
       const isUp = c.close >= c.open;
       const bodyTop = toY(Math.max(c.open, c.close));
       const bodyBot = toY(Math.min(c.open, c.close));
       const bodyH = Math.max(1, bodyBot - bodyTop);
+      const highY = toY(c.high);
+      const lowY = toY(c.low);
+      const left = x - barW / 2;
 
-      // Wick
-      const wickColor = isUp ? 'rgba(34,197,94,0.45)' : 'rgba(239,68,68,0.45)';
-      ctx.strokeStyle = wickColor;
-      ctx.lineWidth = 0.7;
+      // Wick — crisp vertical line from high to low
+      ctx.strokeStyle = isUp ? bullWick : bearWick;
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(x, toY(c.high));
-      ctx.lineTo(x, toY(c.low));
+      ctx.moveTo(x, highY);
+      ctx.lineTo(x, lowY);
       ctx.stroke();
 
-      // Body with gradient
-      const bodyGrad = ctx.createLinearGradient(0, bodyTop, 0, bodyBot);
-      if (isUp) {
-        bodyGrad.addColorStop(0, '#22c55e');
-        bodyGrad.addColorStop(1, '#16a34a');
-      } else {
-        bodyGrad.addColorStop(0, '#ef4444');
-        bodyGrad.addColorStop(1, '#dc2626');
-      }
-      ctx.fillStyle = bodyGrad;
-
-      // Rounded body
-      const r = Math.min(1.5, barW / 4);
-      ctx.beginPath();
-      ctx.moveTo(x - barW / 2 + r, bodyTop);
-      ctx.lineTo(x + barW / 2 - r, bodyTop);
-      ctx.quadraticCurveTo(x + barW / 2, bodyTop, x + barW / 2, bodyTop + r);
-      ctx.lineTo(x + barW / 2, bodyBot - r);
-      ctx.quadraticCurveTo(x + barW / 2, bodyBot, x + barW / 2 - r, bodyBot);
-      ctx.lineTo(x - barW / 2 + r, bodyBot);
-      ctx.quadraticCurveTo(x - barW / 2, bodyBot, x - barW / 2, bodyBot - r);
-      ctx.lineTo(x - barW / 2, bodyTop + r);
-      ctx.quadraticCurveTo(x - barW / 2, bodyTop, x - barW / 2 + r, bodyTop);
-      ctx.closePath();
-      ctx.fill();
-
-      // Glow on larger candles
-      if (bodyH > 4) {
-        ctx.shadowColor = isUp ? '#22c55e' : '#ef4444';
-        ctx.shadowBlur = 6;
-        ctx.fill();
-        ctx.shadowBlur = 0;
-      }
+      // Body — solid filled rectangle
+      ctx.fillStyle = isUp ? bullColor : bearColor;
+      ctx.fillRect(left, bodyTop, barW, bodyH);
     });
 
-    /* ── Area fill under live price ─────────────────────────────── */
+    /* ── Live price line — bright dashed ──────────────────────── */
     const liveY = toY(livePrice);
     const isLiveUp = candles.length > 0 && livePrice >= candles[candles.length - 1].open;
-    const lineColor = isLiveUp ? '#22c55e' : '#ef4444';
+    const lineColor = isLiveUp ? bullColor : bearColor;
 
-    // Area gradient
-    const areaGrad = ctx.createLinearGradient(0, liveY - 40, 0, liveY);
-    areaGrad.addColorStop(0, isLiveUp ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)');
-    areaGrad.addColorStop(1, 'rgba(0,0,0,0)');
+    // Background band for the line (subtle)
+    const bandGrad = ctx.createLinearGradient(0, liveY - 50, 0, liveY + 50);
+    bandGrad.addColorStop(0, isLiveUp ? 'rgba(38,166,154,0)' : 'rgba(239,83,84,0)');
+    bandGrad.addColorStop(0.5, isLiveUp ? 'rgba(38,166,154,0.04)' : 'rgba(239,83,84,0.04)');
+    bandGrad.addColorStop(1, isLiveUp ? 'rgba(38,166,154,0)' : 'rgba(239,83,84,0)');
+    ctx.fillStyle = bandGrad;
+    ctx.fillRect(pad.left, liveY - 50, plotW, 100);
 
-    ctx.beginPath();
-    ctx.moveTo(pad.left, liveY);
-    for (let i = 0; i < candles.length; i++) {
-      const x = pad.left + (i + 0.5) * gap;
-      const y = toY(candles[i].close);
-      ctx.lineTo(x, y);
-    }
-    ctx.lineTo(pad.left + (candles.length - 0.5) * gap, liveY);
-    ctx.lineTo(pad.left, liveY);
-    ctx.closePath();
-    ctx.fillStyle = areaGrad;
-    ctx.fill();
-
-    /* ── Live price line — crisp dashed ────────────────────────── */
-    ctx.shadowColor = lineColor;
-    ctx.shadowBlur = 10;
+    // Dashed line
+    ctx.setLineDash([4, 3]);
     ctx.strokeStyle = lineColor;
-    ctx.lineWidth = 1.2;
-    ctx.setLineDash([6, 4]);
+    ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(pad.left, liveY);
     ctx.lineTo(W - pad.right, liveY);
     ctx.stroke();
-    ctx.shadowBlur = 0;
     ctx.setLineDash([]);
 
-    // Animated dot at the end
-    ctx.beginPath();
-    ctx.arc(W - pad.right + 2, liveY, 3, 0, Math.PI * 2);
-    ctx.fillStyle = lineColor;
-    ctx.shadowColor = lineColor;
-    ctx.shadowBlur = 12;
-    ctx.fill();
-    ctx.shadowBlur = 0;
-
-    /* ── Live price label — premium pill ────────────────────────── */
-    const priceLabel = livePrice >= 1000 ? livePrice.toFixed(0) : livePrice.toFixed(2);
-    ctx.font = 'bold 10px -apple-system, "SF Pro Text", system-ui, sans-serif';
-    const plW = ctx.measureText(priceLabel).width + 18;
-    const plH = 22;
-    const plX = W - pad.right - 1;
+    /* ── Live price label — solid color pill (Binance style) ─── */
+    const priceLabel = livePrice >= 1000 ? livePrice.toFixed(2) : livePrice.toFixed(4);
+    ctx.font = 'bold 11px "SF Mono", Menlo, monospace';
+    const plW = ctx.measureText(priceLabel).width + 12;
+    const plH = 20;
+    const plX = W - pad.right;
     const plY = liveY - plH / 2;
-    const plR = 6;
 
-    // Pill background with gradient
-    const pillGrad = ctx.createLinearGradient(plX, plY, plX + plW, plY);
-    pillGrad.addColorStop(0, lineColor);
-    pillGrad.addColorStop(1, isLiveUp ? '#16a34a' : '#dc2626');
+    // Solid filled pill (no gradient — more realistic)
+    ctx.fillStyle = lineColor;
+    ctx.fillRect(plX, plY, plW, plH);
 
+    // Triangle pointer on the left edge
     ctx.beginPath();
-    ctx.moveTo(plX + plR, plY);
-    ctx.lineTo(plX + plW - plR, plY);
-    ctx.quadraticCurveTo(plX + plW, plY, plX + plW, plY + plR);
-    ctx.lineTo(plX + plW, plY + plH - plR);
-    ctx.quadraticCurveTo(plX + plW, plY + plH, plX + plW - plR, plY + plH);
-    ctx.lineTo(plX + plR, plY + plH);
-    ctx.quadraticCurveTo(plX, plY + plH, plX, plY + plH - plR);
-    ctx.lineTo(plX, plY + plR);
-    ctx.quadraticCurveTo(plX, plY, plX + plR, plY);
+    ctx.moveTo(plX, plY);
+    ctx.lineTo(plX - 4, liveY);
+    ctx.lineTo(plX, plY + plH);
     ctx.closePath();
-    ctx.fillStyle = pillGrad;
-    ctx.shadowColor = lineColor;
-    ctx.shadowBlur = 14;
     ctx.fill();
-    ctx.shadowBlur = 0;
 
-    ctx.fillStyle = '#fff';
+    ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'left';
-    ctx.fillText(priceLabel, plX + 9, liveY + 3.5);
+    ctx.textBaseline = 'middle';
+    ctx.fillText(priceLabel, plX + 6, liveY);
+    ctx.textBaseline = 'alphabetic';
 
-    /* ── Price axis labels ──────────────────────────────────────── */
-    ctx.font = '9px -apple-system, "SF Mono", monospace';
+    /* ── Price axis labels (right) ────────────────────────────── */
+    ctx.font = '10px "SF Mono", Menlo, monospace';
     ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
     for (let i = 0; i <= gridCount; i++) {
       const v = adjMax - (adjRange * i) / gridCount;
       const y = pad.top + (plotH * i) / gridCount;
       const label = v >= 100000 ? `${(v / 1000).toFixed(1)}k` : v >= 1000 ? v.toFixed(0) : v.toFixed(2);
-      ctx.fillStyle = 'rgba(148,163,184,0.45)';
-      ctx.fillText(label, W - pad.right + 8, y + 3);
+      ctx.fillStyle = 'rgba(148,163,184,0.5)';
+      ctx.fillText(label, W - pad.right + 6, y);
     }
+    ctx.textBaseline = 'alphabetic';
 
-    /* ── Time axis labels ───────────────────────────────────────── */
+    /* ── Time axis labels (bottom) ────────────────────────────── */
     ctx.textAlign = 'center';
-    ctx.font = '9px -apple-system, "SF Mono", monospace';
+    ctx.font = '9px "SF Mono", Menlo, monospace';
     const timeStep = Math.max(1, Math.floor(candles.length / 6));
     for (let i = 0; i < candles.length; i += timeStep) {
       const x = pad.left + (i + 0.5) * gap;
       const d = new Date(candles[i].time);
       const t = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
-      ctx.fillStyle = 'rgba(148,163,184,0.35)';
-      ctx.fillText(t, x, H - 10);
+      ctx.fillStyle = 'rgba(148,163,184,0.4)';
+      ctx.fillText(t, x, H - 8);
     }
 
-    /* ── Active trade entry lines ───────────────────────────────── */
+    /* ── Active trade entry lines ─────────────────────────────── */
     activeTrades.forEach(trade => {
       const y = toY(trade.entryPrice);
-      const tradeColor = trade.type === 'UP' ? '#22c55e' : '#ef4444';
-      ctx.setLineDash([4, 4]);
+      const tradeColor = trade.type === 'UP' ? bullColor : bearColor;
+      ctx.setLineDash([4, 3]);
       ctx.strokeStyle = tradeColor;
-      ctx.lineWidth = 0.7;
-      ctx.globalAlpha = 0.35;
+      ctx.lineWidth = 0.8;
+      ctx.globalAlpha = 0.4;
       ctx.beginPath();
       ctx.moveTo(pad.left, y);
       ctx.lineTo(W - pad.right, y);
@@ -345,74 +284,53 @@ const CandlestickChart = ({
       ctx.setLineDash([]);
       ctx.globalAlpha = 1;
 
-      // Small entry label
+      // Entry price tag on left
       const entryLabel = trade.entryPrice >= 1000 ? trade.entryPrice.toFixed(0) : trade.entryPrice.toFixed(2);
-      ctx.font = '8px -apple-system, monospace';
+      ctx.font = 'bold 9px "SF Mono", monospace';
       ctx.fillStyle = tradeColor;
-      ctx.globalAlpha = 0.5;
-      ctx.textAlign = 'right';
-      ctx.fillText(`ENTRY ${entryLabel}`, W - pad.right - 4, y - 5);
+      ctx.globalAlpha = 0.9;
+      const tagW = ctx.measureText(entryLabel).width + 8;
+      ctx.fillRect(pad.left, y - 9, tagW, 14);
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'left';
+      ctx.fillText(entryLabel, pad.left + 4, y + 1);
       ctx.globalAlpha = 1;
     });
 
-    /* ── Time remaining arc ─────────────────────────────────────── */
+    /* ── Time remaining arc (top-right corner) ───────────────── */
     if (primaryTrade && primaryTrade.timeLeft > 0) {
       const progress = 1 - (primaryTrade.timeLeft / primaryTrade.duration);
-      const arcX = pad.left + 22;
-      const arcY = pad.top + 20;
-      const arcR = 16;
+      const arcX = pad.left + 18;
+      const arcY = pad.top + 18;
+      const arcR = 14;
       const isUp = primaryTrade.type === 'UP';
-      const arcColor = isUp ? '#22c55e' : '#ef4444';
+      const arcColor = isUp ? bullColor : bearColor;
 
-      // Background track
+      // Background
       ctx.beginPath();
       ctx.arc(arcX, arcY, arcR, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(148,163,184,0.08)';
-      ctx.lineWidth = 2.5;
+      ctx.fillStyle = 'rgba(13, 17, 23, 0.9)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(148,163,184,0.1)';
+      ctx.lineWidth = 2;
       ctx.stroke();
 
-      // Progress arc
-      ctx.shadowColor = arcColor;
-      ctx.shadowBlur = 10;
+      // Progress
       ctx.beginPath();
       ctx.arc(arcX, arcY, arcR, -Math.PI / 2, -Math.PI / 2 + progress * Math.PI * 2);
       ctx.strokeStyle = arcColor;
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = 2;
       ctx.lineCap = 'round';
       ctx.stroke();
       ctx.lineCap = 'butt';
-      ctx.shadowBlur = 0;
 
       // Time text
       ctx.fillStyle = '#fff';
-      ctx.font = 'bold 9px -apple-system, monospace';
+      ctx.font = 'bold 9px "SF Mono", monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(`${primaryTrade.timeLeft}s`, arcX, arcY);
+      ctx.fillText(`${primaryTrade.timeLeft}`, arcX, arcY);
       ctx.textBaseline = 'alphabetic';
-
-      // Vertical current candle line
-      const currentX = pad.left + (candles.length - 0.5) * gap;
-      ctx.setLineDash([2, 3]);
-      ctx.strokeStyle = 'rgba(239,68,68,0.2)';
-      ctx.lineWidth = 0.5;
-      ctx.beginPath();
-      ctx.moveTo(currentX, pad.top);
-      ctx.lineTo(currentX, pad.top + plotH);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-
-    /* ── Top-left price watermark ───────────────────────────────── */
-    if (candles.length > 0) {
-      const lastCandle = candles[candles.length - 1];
-      const change = ((lastCandle.close - lastCandle.open) / lastCandle.open * 100);
-      ctx.font = 'bold 13px -apple-system, "SF Pro Text", system-ui, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillStyle = change >= 0 ? 'rgba(34,197,94,0.6)' : 'rgba(239,68,68,0.6)';
-      const priceStr = livePrice >= 1000 ? livePrice.toFixed(0) : livePrice.toFixed(2);
-      const changeStr = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
-      ctx.fillText(`${priceStr}  ${changeStr}`, pad.left + 4, pad.top + 18);
     }
 
   }, [candles, livePrice, activeTrades, primaryTrade]);
@@ -426,9 +344,9 @@ const CandlestickChart = ({
 
 /* ─── Colors ────────────────────────────────────────────────────────────── */
 const C = {
-  bg: '#0f1420',
-  up: '#22c55e',
-  down: '#ef4444',
+  bg: '#0d1117',
+  up: '#26a69a',
+  down: '#ef5354',
   accent: '#3b82f6',
   muted: '#64748b',
   card: '#151d2e',
@@ -443,7 +361,7 @@ function formatTime(sec: number) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-/* ─── Majority Opinion Bar ─────────────────────────────────────────────── */
+/* ─── Market Sentiment Bar ─────────────────────────────────────────────── */
 const MajorityOpinion = () => {
   const upPct = 40 + Math.floor(Math.random() * 20);
   const downPct = 100 - upPct;
@@ -453,8 +371,8 @@ const MajorityOpinion = () => {
         <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Market Sentiment</span>
       </div>
       <div className="flex h-1.5 rounded-full overflow-hidden bg-white/[0.03]">
-        <div className="rounded-l-full transition-all duration-500" style={{ width: `${upPct}%`, background: 'linear-gradient(90deg, #22c55e, #16a34a)' }} />
-        <div className="rounded-r-full transition-all duration-500" style={{ width: `${downPct}%`, background: 'linear-gradient(90deg, #ef4444, #dc2626)' }} />
+        <div className="rounded-l-full transition-all duration-500" style={{ width: `${upPct}%`, background: C.up }} />
+        <div className="rounded-r-full transition-all duration-500" style={{ width: `${downPct}%`, background: C.down }} />
       </div>
       <div className="flex justify-between mt-1">
         <span className="text-[10px] font-bold tabular-nums" style={{ color: C.up }}>{upPct}%</span>
@@ -480,7 +398,6 @@ const TradingDashboard: React.FC<{
 }) => {
   const [showDeposit, setShowDeposit] = useState(false);
   const [showWithdraw, setShowWithdraw] = useState(false);
-  const [toast] = useState<string | null>(null);
   const isDemo = accountMode === 'demo';
 
   const [asset, setAsset] = useState(ASSETS[0]);
@@ -578,30 +495,30 @@ const TradingDashboard: React.FC<{
   const isPriceUp = priceChange >= 0;
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col text-white overflow-hidden" style={{ background: '#0b0f1a' }}>
+    <div className="flex flex-col h-full w-full text-white overflow-hidden" style={{ background: '#0d1117' }}>
 
       {/* ── Header ─────────────────────────────────────────────────── */}
-      <header className="shrink-0 flex items-center justify-between gap-3 px-4 py-2.5" style={{ background: 'linear-gradient(180deg, #111827 0%, #0f1520 100%)', borderBottom: '1px solid rgba(148,163,184,0.06)' }}>
+      <header className="shrink-0 flex items-center justify-between gap-3 px-3 py-2 md:px-4" style={{ background: '#0d1117', borderBottom: '1px solid rgba(148,163,184,0.06)' }}>
         <button
           type="button"
           onClick={() => setShowDeposit(true)}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[11px] font-bold transition-all active:scale-95"
-          style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', color: '#22c55e' }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all active:scale-95"
+          style={{ background: 'rgba(38,166,154,0.1)', border: '1px solid rgba(38,166,154,0.25)', color: '#26a69a' }}
         >
           <Wallet className="w-3.5 h-3.5" />
           Deposit
         </button>
         <div className="flex flex-col items-center">
           <AccountToggle mode={accountMode} onChange={setAccountMode} compact />
-          <span className={`text-lg font-black tabular-nums mt-0.5 tracking-tight ${isDemo ? 'text-amber-400' : 'text-white'}`}>
+          <span className={`text-base font-black tabular-nums mt-0.5 tracking-tight ${isDemo ? 'text-amber-400' : 'text-white'}`}>
             ₹{balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
         </div>
         <button
           type="button"
           onClick={() => setShowWithdraw(true)}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[11px] font-bold transition-all active:scale-95"
-          style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', color: '#fbbf24' }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all active:scale-95"
+          style={{ background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.25)', color: '#fbbf24' }}
         >
           <ArrowDownToLine className="w-3.5 h-3.5" />
           Withdraw
@@ -609,34 +526,29 @@ const TradingDashboard: React.FC<{
       </header>
 
       {/* ── Asset Tabs ─────────────────────────────────────────────── */}
-      <div className="shrink-0 flex items-center gap-2 px-4 py-2 overflow-x-auto" style={{ background: '#0f1520', borderBottom: '1px solid rgba(148,163,184,0.05)' }}>
+      <div className="shrink-0 flex items-center gap-2 px-3 py-2 md:px-4 overflow-x-auto" style={{ background: '#0d1117', borderBottom: '1px solid rgba(148,163,184,0.04)' }}>
         {ASSETS.map(a => (
           <button
             key={a.id}
             type="button"
             onClick={() => setAsset(a)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-              asset.id === a.id
-                ? 'text-white'
-                : 'text-slate-500 hover:text-slate-300'
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
+              asset.id === a.id ? 'text-white' : 'text-slate-500'
             }`}
-            style={asset.id === a.id ? { background: 'rgba(148,163,184,0.08)', border: '1px solid rgba(148,163,184,0.1)' } : { border: '1px solid transparent' }}
+            style={asset.id === a.id
+              ? { background: 'rgba(148,163,184,0.08)', border: '1px solid rgba(148,163,184,0.1)' }
+              : { border: '1px solid transparent' }
+            }
           >
             <span style={{ color: a.color }}>{a.icon}</span>
             <span>{a.name}</span>
             <span className={`text-[10px] font-bold ${asset.id === a.id ? 'text-amber-400' : 'text-slate-600'}`}>{a.yield}%</span>
           </button>
         ))}
-        <div className="ml-auto flex items-center gap-2 px-3 py-1.5 rounded-xl shrink-0" style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)' }}>
-          <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#22c55e', boxShadow: '0 0 8px rgba(34,197,94,0.6)' }} />
-          <span className="text-xs font-mono font-bold tabular-nums text-blue-400">
-            ₹{price >= 1000 ? price.toFixed(0) : price.toFixed(2)}
-          </span>
-        </div>
       </div>
 
       {/* ── Chart ──────────────────────────────────────────────────── */}
-      <div className="flex-1 min-h-0 relative" style={{ background: 'linear-gradient(180deg, #111827 0%, #0b0f1a 100%)' }}>
+      <div className="flex-1 min-h-0 relative" style={{ background: '#0d1117' }}>
         <CandlestickChart
           candles={candles}
           livePrice={price}
@@ -645,46 +557,37 @@ const TradingDashboard: React.FC<{
         />
 
         {/* Asset info overlay — top left */}
-        <div className="absolute top-3 left-3 pointer-events-none">
-          <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl" style={{ background: 'rgba(15,20,32,0.85)', backdropFilter: 'blur(12px)', border: '1px solid rgba(148,163,184,0.06)' }}>
-            <span className="text-lg" style={{ color: asset.color }}>{asset.icon}</span>
-            <div>
-              <p className="text-[11px] font-bold text-white tracking-wide">{asset.name}</p>
-              <p className="text-[10px] font-mono font-bold tabular-nums" style={{ color: isPriceUp ? '#22c55e' : '#ef4444' }}>
+        <div className="absolute top-2 left-2 pointer-events-none">
+          <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg" style={{ background: 'rgba(13,17,23,0.85)', backdropFilter: 'blur(8px)', border: '1px solid rgba(148,163,184,0.06)' }}>
+            <span className="text-base" style={{ color: asset.color }}>{asset.icon}</span>
+            <div className="flex flex-col">
+              <span className="text-[10px] font-bold text-slate-300">{asset.name}</span>
+              <span className="text-[10px] font-bold tabular-nums" style={{ color: isPriceUp ? '#26a69a' : '#ef5354' }}>
                 {isPriceUp ? '+' : ''}{priceChange.toFixed(2)}%
-              </p>
+              </span>
             </div>
           </div>
         </div>
 
-        {/* OHLCV overlay — top right */}
-        {candles.length > 0 && (
-          <div className="absolute top-3 right-3 pointer-events-none">
-            <div className="flex items-center gap-3 px-3 py-2 rounded-xl" style={{ background: 'rgba(15,20,32,0.85)', backdropFilter: 'blur(12px)', border: '1px solid rgba(148,163,184,0.06)' }}>
-              <OHLCDisplay candle={candles[candles.length - 1]} />
-            </div>
-          </div>
-        )}
-
         {/* MA Legend — bottom left */}
-        <div className="absolute bottom-8 left-3 pointer-events-none flex items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-0.5 rounded-full" style={{ background: '#f59e0b' }} />
-            <span className="text-[9px] font-mono text-amber-500/60">MA7</span>
+        <div className="absolute bottom-7 left-2 pointer-events-none flex items-center gap-2.5">
+          <div className="flex items-center gap-1">
+            <div className="w-2.5 h-px rounded-full" style={{ background: 'rgba(245,158,11,0.7)' }} />
+            <span className="text-[9px] font-mono" style={{ color: 'rgba(245,158,11,0.7)' }}>MA7</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-0.5 rounded-full" style={{ background: '#8b5cf6' }} />
-            <span className="text-[9px] font-mono text-violet-500/60">MA25</span>
+          <div className="flex items-center gap-1">
+            <div className="w-2.5 h-px rounded-full" style={{ background: 'rgba(139,92,246,0.7)' }} />
+            <span className="text-[9px] font-mono" style={{ color: 'rgba(139,92,246,0.7)' }}>MA25</span>
           </div>
         </div>
       </div>
 
       {/* ── Controls ───────────────────────────────────────────────── */}
-      <div className="shrink-0 px-4 pt-3 pb-[max(10px,env(safe-area-inset-bottom))]" style={{ background: 'linear-gradient(180deg, #111827 0%, #0f1520 100%)', borderTop: '1px solid rgba(148,163,184,0.06)' }}>
+      <div className="shrink-0 px-3 pt-2.5 pb-[max(8px,env(safe-area-inset-bottom))] md:px-4" style={{ background: '#0d1117', borderTop: '1px solid rgba(148,163,184,0.06)' }}>
 
         {/* Active trades */}
         {activeTrades.length > 0 && (
-          <div className="mb-2.5 space-y-1.5 max-h-20 overflow-y-auto">
+          <div className="mb-2 space-y-1 max-h-16 overflow-y-auto">
             {activeTrades.map(t => {
               const isUp = t.type === 'UP';
               const pnl = isUp
@@ -692,32 +595,22 @@ const TradingDashboard: React.FC<{
                 : ((t.entryPrice - price) / t.entryPrice) * t.amount;
               const isProfit = pnl >= 0;
               return (
-                <div key={t.id} className="flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs" style={{
-                  background: isProfit ? 'rgba(34,197,94,0.05)' : 'rgba(239,68,68,0.05)',
-                  border: `1px solid ${isProfit ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)'}`,
+                <div key={t.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs" style={{
+                  background: isProfit ? 'rgba(38,166,154,0.06)' : 'rgba(239,83,84,0.06)',
+                  border: `1px solid ${isProfit ? 'rgba(38,166,154,0.15)' : 'rgba(239,83,84,0.15)'}`,
                 }}>
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black" style={{
-                    background: isProfit ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
+                  <div className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black" style={{
+                    background: isProfit ? 'rgba(38,166,154,0.15)' : 'rgba(239,83,84,0.15)',
                     color: isProfit ? C.up : C.down,
                   }}>
                     {isProfit ? '▲' : '▼'}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-white text-[11px]">₹{t.amount} · {t.type}</span>
-                      <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md" style={{
-                        background: isProfit ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
-                        color: isProfit ? C.up : C.down,
-                      }}>
-                        {isProfit ? 'PROFIT' : 'LOSS'}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between mt-0.5">
-                      <span className="text-[10px] font-mono text-slate-500">{formatTime(t.timeLeft)} left</span>
-                      <span className="text-xs font-black tabular-nums" style={{ color: isProfit ? C.up : C.down }}>
-                        {pnl >= 0 ? '+' : ''}₹{pnl.toFixed(0)}
-                      </span>
-                    </div>
+                  <div className="flex-1 min-w-0 flex items-center justify-between">
+                    <span className="font-bold text-white text-[11px]">₹{t.amount} · {t.type}</span>
+                    <span className="text-[10px] font-mono text-slate-500">{formatTime(t.timeLeft)}</span>
+                    <span className="text-xs font-black tabular-nums" style={{ color: isProfit ? C.up : C.down }}>
+                      {pnl >= 0 ? '+' : ''}₹{pnl.toFixed(0)}
+                    </span>
                   </div>
                 </div>
               );
@@ -725,82 +618,78 @@ const TradingDashboard: React.FC<{
           </div>
         )}
 
-        {/* Amount & Time — premium controls */}
-        <div className="flex gap-3 mb-2.5">
+        {/* Amount & Time — compact */}
+        <div className="flex gap-2 mb-2">
           <div className="flex-1">
-            <label className="text-[9px] font-semibold text-slate-500 uppercase tracking-wider mb-1 block px-1">Amount</label>
-            <div className="flex items-center h-11 rounded-xl overflow-hidden" style={{ background: '#1a2332', border: '1px solid rgba(148,163,184,0.08)' }}>
+            <div className="flex items-center h-9 rounded-lg overflow-hidden" style={{ background: '#161b22', border: '1px solid rgba(148,163,184,0.08)' }}>
               <button type="button" onClick={() => setAmount(a => Math.max(100, a - 100))}
-                className="w-10 h-full flex items-center justify-center transition-colors active:bg-white/5">
-                <Minus className="w-3.5 h-3.5 text-slate-500" />
+                className="w-8 h-full flex items-center justify-center active:bg-white/5">
+                <Minus className="w-3 h-3 text-slate-500" />
               </button>
               <div className="flex-1 flex items-center justify-center">
-                <span className="text-sm font-black text-white tabular-nums">₹{amount}</span>
+                <span className="text-[13px] font-black text-white tabular-nums">₹{amount}</span>
               </div>
               <button type="button" onClick={() => setAmount(a => a + 100)}
-                className="w-10 h-full flex items-center justify-center transition-colors active:bg-white/5">
-                <Plus className="w-3.5 h-3.5 text-slate-500" />
+                className="w-8 h-full flex items-center justify-center active:bg-white/5">
+                <Plus className="w-3 h-3 text-slate-500" />
               </button>
             </div>
           </div>
           <div className="flex-1">
-            <label className="text-[9px] font-semibold text-slate-500 uppercase tracking-wider mb-1 block px-1">Duration</label>
-            <div className="flex items-center h-11 rounded-xl overflow-hidden" style={{ background: '#1a2332', border: '1px solid rgba(148,163,184,0.08)' }}>
+            <div className="flex items-center h-9 rounded-lg overflow-hidden" style={{ background: '#161b22', border: '1px solid rgba(148,163,184,0.08)' }}>
               <button type="button" onClick={() => setDuration(d => Math.max(10, d - 10))}
-                className="w-10 h-full flex items-center justify-center transition-colors active:bg-white/5">
-                <Minus className="w-3.5 h-3.5 text-slate-500" />
+                className="w-8 h-full flex items-center justify-center active:bg-white/5">
+                <Minus className="w-3 h-3 text-slate-500" />
               </button>
               <div className="flex-1 flex items-center justify-center">
-                <span className="text-sm font-black text-white tabular-nums">{formatTime(duration)}</span>
+                <span className="text-[13px] font-black text-white tabular-nums">{formatTime(duration)}</span>
               </div>
               <button type="button" onClick={() => setDuration(d => d + 10)}
-                className="w-10 h-full flex items-center justify-center transition-colors active:bg-white/5">
-                <Plus className="w-3.5 h-3.5 text-slate-500" />
+                className="w-8 h-full flex items-center justify-center active:bg-white/5">
+                <Plus className="w-3 h-3 text-slate-500" />
               </button>
             </div>
           </div>
         </div>
 
-        {/* Earnings */}
-        <div className="flex items-center justify-between mb-1.5 px-1">
-          <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Potential Earnings</span>
-          <div className="flex items-center gap-3">
-            <span className="text-[10px] font-bold text-emerald-400">+{asset.yield}%</span>
-            <span className="text-sm font-black text-white tabular-nums">₹{payout.toLocaleString('en-IN', { maximumFractionDigits: 0 })}.00</span>
+        {/* Earnings row */}
+        <div className="flex items-center justify-between mb-1.5 px-0.5">
+          <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Earnings</span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold" style={{ color: C.up }}>+{asset.yield}%</span>
+            <span className="text-[13px] font-black text-white tabular-nums">₹{payout.toLocaleString('en-IN', { maximumFractionDigits: 0 })}.00</span>
           </div>
         </div>
 
         {/* Sentiment */}
         <MajorityOpinion />
 
-        {/* Trade buttons — premium */}
-        <div className="grid grid-cols-2 gap-3 mt-3">
+        {/* Trade buttons */}
+        <div className="grid grid-cols-2 gap-2 mt-2">
           <button
             type="button"
             onClick={() => handleTrade('UP')}
             disabled={balance < amount}
-            className="h-13 rounded-2xl flex items-center justify-center gap-2 font-black text-sm tracking-wide active:scale-[0.97] transition-all disabled:opacity-30"
+            className="h-11 rounded-xl flex items-center justify-center gap-1.5 font-black text-sm active:scale-[0.97] transition-all disabled:opacity-30"
             style={{
-              background: 'linear-gradient(135deg, #22c55e, #16a34a)',
-              boxShadow: '0 4px 20px rgba(34,197,94,0.3), inset 0 1px 0 rgba(255,255,255,0.1)',
-              height: '52px',
+              background: C.up,
+              boxShadow: '0 2px 12px rgba(38,166,154,0.25)',
             }}
           >
-            <ArrowUp className="w-5 h-5" strokeWidth={3} />
+            <ArrowUp className="w-4 h-4" strokeWidth={3} />
             <span>UP</span>
           </button>
           <button
             type="button"
             onClick={() => handleTrade('DOWN')}
             disabled={balance < amount}
-            className="h-13 rounded-2xl flex items-center justify-center gap-2 font-black text-sm tracking-wide active:scale-[0.97] transition-all disabled:opacity-30"
+            className="h-11 rounded-xl flex items-center justify-center gap-1.5 font-black text-sm active:scale-[0.97] transition-all disabled:opacity-30"
             style={{
-              background: 'linear-gradient(135deg, #ef4444, #dc2626)',
-              boxShadow: '0 4px 20px rgba(239,68,68,0.3), inset 0 1px 0 rgba(255,255,255,0.1)',
-              height: '52px',
+              background: C.down,
+              boxShadow: '0 2px 12px rgba(239,83,84,0.25)',
             }}
           >
-            <ArrowDown className="w-5 h-5" strokeWidth={3} />
+            <ArrowDown className="w-4 h-4" strokeWidth={3} />
             <span>DOWN</span>
           </button>
         </div>
@@ -808,37 +697,26 @@ const TradingDashboard: React.FC<{
 
       {/* ── Result Popup ───────────────────────────────────────────── */}
       {result && (
-        <div className="absolute inset-x-0 top-16 z-[100] flex justify-center pointer-events-none animate-[slideUp_0.3s_ease-out]">
-          <div className="flex items-center gap-5 px-8 py-5 rounded-2xl backdrop-blur-xl" style={{
-            background: result.win ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
-            border: `1px solid ${result.win ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+        <div className="absolute inset-x-0 top-12 z-[100] flex justify-center pointer-events-none animate-[slideUp_0.3s_ease-out]">
+          <div className="flex items-center gap-3 px-5 py-3 rounded-xl backdrop-blur-xl" style={{
+            background: result.win ? 'rgba(38,166,154,0.12)' : 'rgba(239,83,84,0.12)',
+            border: `1px solid ${result.win ? 'rgba(38,166,154,0.4)' : 'rgba(239,83,84,0.4)'}`,
             boxShadow: result.win
-              ? '0 0 60px rgba(34,197,94,0.15), 0 8px 32px rgba(0,0,0,0.5)'
-              : '0 0 60px rgba(239,68,68,0.15), 0 8px 32px rgba(0,0,0,0.5)',
+              ? '0 0 40px rgba(38,166,154,0.2)'
+              : '0 0 40px rgba(239,83,84,0.2)',
           }}>
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{
-              background: result.win ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
-            }}>
-              {result.win
-                ? <TrendingUp className="w-8 h-8" strokeWidth={2.5} style={{ color: C.up }} />
-                : <TrendingDown className="w-8 h-8" strokeWidth={2.5} style={{ color: C.down }} />}
-            </div>
+            {result.win
+              ? <TrendingUp className="w-7 h-7" strokeWidth={2.5} style={{ color: C.up }} />
+              : <TrendingDown className="w-7 h-7" strokeWidth={2.5} style={{ color: C.down }} />}
             <div>
-              <p className="text-[11px] font-black tracking-widest uppercase" style={{ color: result.win ? C.up : C.down }}>
+              <p className="text-[10px] font-black tracking-widest uppercase" style={{ color: result.win ? C.up : C.down }}>
                 {result.win ? 'PROFIT' : 'LOSS'}
               </p>
-              <p className="text-3xl font-black tabular-nums mt-1" style={{ color: result.win ? C.up : C.down }}>
+              <p className="text-2xl font-black tabular-nums" style={{ color: result.win ? C.up : C.down }}>
                 {result.amt >= 0 ? '+' : ''}₹{Math.abs(result.amt).toLocaleString('en-IN')}
               </p>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* ── Toast ──────────────────────────────────────────────────── */}
-      {toast && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-[120] px-4 py-2 rounded-xl" style={{ background: '#1a2332', border: '1px solid rgba(251,191,36,0.3)', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
-          <p className="text-xs font-bold text-amber-400">{toast}</p>
         </div>
       )}
 
@@ -864,19 +742,6 @@ const TradingDashboard: React.FC<{
           to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
-    </div>
-  );
-};
-
-/* ─── OHLC Display Component ───────────────────────────────────────────── */
-const OHLCDisplay = ({ candle }: { candle: Candle }) => {
-  const fmt = (v: number) => v >= 1000 ? v.toFixed(0) : v.toFixed(2);
-  return (
-    <div className="flex items-center gap-2.5 text-[10px] font-mono">
-      <span className="text-slate-500">O <span className="text-slate-300">{fmt(candle.open)}</span></span>
-      <span className="text-slate-500">H <span style={{ color: '#22c55e' }}>{fmt(candle.high)}</span></span>
-      <span className="text-slate-500">L <span style={{ color: '#ef4444' }}>{fmt(candle.low)}</span></span>
-      <span className="text-slate-500">C <span className="text-white">{fmt(candle.close)}</span></span>
     </div>
   );
 };
