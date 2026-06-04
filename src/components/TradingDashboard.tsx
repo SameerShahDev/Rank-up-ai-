@@ -715,72 +715,112 @@ const TradingDashboard: React.FC<{
   return (
     <div className="flex flex-col h-full w-full text-white overflow-hidden" style={{ background: '#0a0e17' }}>
 
-      {/* ── Top bar: symbol + price ──────────────────────────────── */}
-      <div className="shrink-0 flex items-center gap-3 px-3 py-2" style={{ borderBottom: '1px solid rgba(56,70,90,0.3)' }}>
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm font-black" style={{ background: `${asset.color}20`, color: asset.color }}>
-            {asset.icon}
+      {/* ── Clean Top Section (Refactored) ───────────────────────── */}
+      <div className="shrink-0 space-y-0" style={{ borderBottom: '1px solid rgba(56,70,90,0.25)' }}>
+        
+        {/* Row 1: Balance & Account Controls + Price Display */}
+        <div className="flex items-center justify-between px-3 py-2">
+          <div className="flex items-center gap-2">
+            <AccountToggle mode={accountMode} onChange={setAccountMode} compact />
+            <span className={`text-[11px] font-black tabular-nums px-2.5 py-1 rounded-md ${isDemo ? 'text-amber-400' : 'text-white'}`} style={{ background: 'rgba(10,14,23,0.85)', border: '1px solid rgba(56,70,90,0.3)' }}>
+              ₹{balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
           </div>
-          <div className="flex flex-col leading-none">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[13px] font-black text-white">{asset.id}/INR</span>
-              <span className="text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: 'rgba(59,130,246,0.15)', color: '#60a5fa' }}>10x</span>
-            </div>
-            <span className="text-[9px] font-medium text-slate-500 mt-0.5">Bitcoin · Spot</span>
+          
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowDeposit(true)}
+              className="px-2 py-1 rounded-md text-[10px] font-bold"
+              style={{ background: 'rgba(38,166,154,0.12)', border: '1px solid rgba(38,166,154,0.25)', color: C.up }}
+            >
+              Deposit
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowWithdraw(true)}
+              className="px-2 py-1 rounded-md text-[10px] font-bold"
+              style={{ background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.25)', color: '#fbbf24' }}
+            >
+              Withdraw
+            </button>
           </div>
         </div>
-        <div className="flex-1 flex flex-col items-end leading-none">
-          <span className={`text-base font-black tabular-nums tracking-tight ${isPriceUp ? '' : ''}`} style={{ color: isPriceUp ? C.up : C.down }}>
-            {price >= 1000 ? price.toFixed(0) : price.toFixed(2)}
-          </span>
-          <div className="flex items-center gap-1.5 mt-0.5">
+
+        {/* Row 2: Asset Info + Live Price */}
+        <div className="flex items-center justify-between px-3 py-1.5" style={{ borderTop: '1px solid rgba(56,70,90,0.15)' }}>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-base font-black" style={{ background: `${asset.color}20`, color: asset.color }}>
+              {asset.icon}
+            </div>
+            <div className="flex flex-col leading-tight">
+              <span className="text-sm font-black text-white">{asset.id}/INR</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(59,130,246,0.12)', color: '#60a5fa' }}>10x</span>
+                <span className="text-[9px] font-medium text-slate-500">{asset.yield}% ROI</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex flex-col items-end leading-tight">
+            <span className="text-lg font-black tabular-nums" style={{ color: isPriceUp ? C.up : C.down }}>
+              {price >= 1000 ? price.toFixed(0) : price.toFixed(2)}
+            </span>
             <span className="text-[10px] font-bold tabular-nums" style={{ color: isPriceUp ? C.up : C.down }}>
-              {isPriceUp ? '+' : ''}{priceChange.toFixed(2)} ({isPriceUp ? '+' : ''}{priceChangePct.toFixed(2)}%)
+              {isPriceUp ? '+' : ''}{priceChangePct.toFixed(2)}%
             </span>
           </div>
         </div>
-      </div>
 
-      {/* ── Timeframe tabs ───────────────────────────────────────── */}
-      <div className="shrink-0 flex items-center gap-0.5 px-2 py-1.5" style={{ borderBottom: '1px solid rgba(56,70,90,0.2)' }}>
-        {TIMEFRAMES.map(t => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTf(t.id)}
-            className="px-2.5 py-1 text-[10px] font-bold rounded transition-all"
-            style={tf === t.id
-              ? { background: 'rgba(59,130,246,0.12)', color: '#60a5fa' }
-              : { color: '#64748b' }
-            }
-          >
-            {t.label}
-          </button>
-        ))}
-        <div className="ml-auto flex items-center gap-2 text-[9px] font-mono text-slate-500">
-          <span>H <span className="text-slate-400 font-bold">{high24 >= 1000 ? high24.toFixed(0) : high24.toFixed(2)}</span></span>
-          <span>L <span className="text-slate-400 font-bold">{low24 >= 1000 ? low24.toFixed(0) : low24.toFixed(2)}</span></span>
+        {/* Row 3: Timeframe + Asset Selector + 24h H/L */}
+        <div className="flex flex-col gap-0.5 px-2 py-1.5" style={{ borderTop: '1px solid rgba(56,70,90,0.15)' }}>
+          
+          {/* Timeframes */}
+          <div className="flex items-center gap-0.5">
+            {TIMEFRAMES.map(t => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTf(t.id)}
+                className="flex-1 px-2 py-1.5 text-[10px] font-bold rounded-md transition-all"
+                style={tf === t.id
+                  ? { background: 'rgba(59,130,246,0.12)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.25)' }
+                  : { color: '#64748b', border: '1px solid rgba(56,70,90,0.2)' }
+                }
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Assets + H/L */}
+          <div className="flex items-center justify-between gap-1.5">
+            <div className="flex items-center gap-1 overflow-x-auto">
+              {ASSETS.map(a => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => setAsset(a)}
+                  className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold whitespace-nowrap transition-all"
+                  style={asset.id === a.id
+                    ? { background: 'rgba(56,70,90,0.45)', color: '#fff', border: '1px solid rgba(56,70,90,0.6)' }
+                    : { background: 'rgba(56,70,90,0.18)', color: '#94a3b8' }
+                  }
+                >
+                  <span style={{ color: a.color }}>{a.icon}</span>
+                  <span>{a.id}</span>
+                </button>
+              ))}
+            </div>
+            
+            <div className="shrink-0 flex items-center gap-3 text-[9px] font-mono text-slate-500">
+              <span>H <span className="text-slate-300 font-semibold">{high24 >= 1000 ? high24.toFixed(0) : high24.toFixed(2)}</span></span>
+              <span>L <span className="text-slate-300 font-semibold">{low24 >= 1000 ? low24.toFixed(0) : low24.toFixed(2)}</span></span>
+            </div>
+          </div>
+
         </div>
-      </div>
 
-      {/* ── Asset selector pills ────────────────────────────────── */}
-      <div className="shrink-0 flex items-center gap-1.5 px-2 py-1.5 overflow-x-auto" style={{ borderBottom: '1px solid rgba(56,70,90,0.2)' }}>
-        {ASSETS.map(a => (
-          <button
-            key={a.id}
-            type="button"
-            onClick={() => setAsset(a)}
-            className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold whitespace-nowrap transition-all"
-            style={asset.id === a.id
-              ? { background: 'rgba(56,70,90,0.5)', color: '#fff' }
-              : { background: 'rgba(56,70,90,0.2)', color: '#94a3b8' }
-            }
-          >
-            <span style={{ color: a.color }}>{a.icon}</span>
-            <span>{a.id}</span>
-            <span style={{ color: '#fbbf24' }}>{a.yield}%</span>
-          </button>
-        ))}
       </div>
 
       {/* ── Chart ────────────────────────────────────────────────── */}
@@ -896,35 +936,7 @@ const TradingDashboard: React.FC<{
         </div>
       </div>
 
-      {/* ── Floating balance / actions ──────────────────────────── */}
-      <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => setShowDeposit(true)}
-          className="px-2.5 py-1 rounded-md text-[10px] font-bold"
-          style={{ background: 'rgba(38,166,154,0.15)', border: '1px solid rgba(38,166,154,0.3)', color: C.up }}
-        >
-          <Wallet className="w-3 h-3 inline mr-1" />
-          Deposit
-        </button>
-        <button
-          type="button"
-          onClick={() => setShowWithdraw(true)}
-          className="px-2.5 py-1 rounded-md text-[10px] font-bold"
-          style={{ background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.3)', color: '#fbbf24' }}
-        >
-          <ArrowDownToLine className="w-3 h-3 inline mr-1" />
-          Withdraw
-        </button>
-      </div>
 
-      {/* Balance pill */}
-      <div className="absolute top-2 left-2 z-20 flex items-center gap-1.5">
-        <AccountToggle mode={accountMode} onChange={setAccountMode} compact />
-        <span className={`text-[11px] font-black tabular-nums px-2 py-1 rounded-md ${isDemo ? 'text-amber-400' : 'text-white'}`} style={{ background: 'rgba(10,14,23,0.85)', border: '1px solid rgba(56,70,90,0.3)' }}>
-          ₹{balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </span>
-      </div>
 
       {/* ── Result Popup ─────────────────────────────────────────── */}
       {result && (
