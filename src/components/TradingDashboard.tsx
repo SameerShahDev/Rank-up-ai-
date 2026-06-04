@@ -102,14 +102,7 @@ const CandlestickChart = ({
     const innerW = innerRight - innerLeft;
 
     /* ── Background ───────────────────────────────────────────── */
-    ctx.fillStyle = '#0a0e17';
-    ctx.fillRect(0, 0, W, H);
-
-    // Subtle vignette
-    const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.8);
-    vg.addColorStop(0, 'rgba(20, 30, 50, 0.15)');
-    vg.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = vg;
+    ctx.fillStyle = '#161a25';
     ctx.fillRect(0, 0, W, H);
 
     if (candles.length < 1) return;
@@ -155,10 +148,10 @@ const CandlestickChart = ({
     const xFor = (i: number) => innerLeft + (i + 0.5) * slot;
 
     /* ── Color palette ────────────────────────────────────────── */
-    const BULL = '#26a69a';
-    const BEAR = '#ef5354';
-    const GRID = 'rgba(56, 70, 90, 0.22)';
-    const GRID_STRONG = 'rgba(70, 85, 110, 0.35)';
+    const BULL = '#0ecb81';
+    const BEAR = '#f6465d';
+    const GRID = 'rgba(43, 49, 57, 0.5)';
+    const GRID_STRONG = 'rgba(43, 49, 57, 0.8)';
     const TEXT = 'rgba(140, 156, 178, 0.7)';
     const TEXT_DIM = 'rgba(120, 135, 155, 0.45)';
 
@@ -212,39 +205,7 @@ const CandlestickChart = ({
     ctx.lineTo(innerRight, px(volTop + volH));
     ctx.stroke();
 
-    /* ── Moving averages ──────────────────────────────────────── */
-    const drawMA = (period: number, color: string) => {
-      if (visible.length < period) return;
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      let started = false;
-      for (let i = period - 1; i < visible.length; i++) {
-        let sum = 0;
-        for (let j = i - period + 1; j <= i; j++) sum += visible[j].close;
-        const v = sum / period;
-        const x = xFor(i);
-        const y = toY(v);
-        if (!started) { ctx.moveTo(x, y); started = true; }
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-    };
-    drawMA(7, 'rgba(255, 152, 0, 0.75)');
-    drawMA(25, 'rgba(124, 77, 255, 0.65)');
-
-    /* ── Volume bars (rendered first, behind candles) ─────────── */
-    const maxVol = Math.max(...visible.map(c => c.volume || 0), 1);
-    for (let i = 0; i < visible.length; i++) {
-      const c = visible[i];
-      const x = xFor(i);
-      const isUp = c.close >= c.open;
-      const vH = Math.max(1, ((c.volume || 0) / maxVol) * volH * 0.9);
-      const left = x - barW / 2;
-      const top = volTop + volH - vH;
-      ctx.fillStyle = isUp ? 'rgba(38, 166, 154, 0.35)' : 'rgba(239, 83, 84, 0.35)';
-      ctx.fillRect(left, top, barW, vH);
-    }
+    /* ── Moving averages & Volume (Removed) ───────────────────── */
 
     /* ── Candles — pixel-snapped crisp rendering ──────────────── */
     for (let i = 0; i < visible.length; i++) {
@@ -260,10 +221,10 @@ const CandlestickChart = ({
       const bodyH = Math.max(1, bodyBot - bodyTop);
       const left = Math.floor(x - barW / 2);
 
-      // Wick — 1px crisp vertical line
+      // Wick — 2px crisp vertical line
       const wickX = px(x);
       ctx.strokeStyle = isUp ? BULL : BEAR;
-      ctx.lineWidth = 1;
+      ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(wickX, yHigh);
       ctx.lineTo(wickX, yLow);
@@ -280,16 +241,8 @@ const CandlestickChart = ({
     const isLiveUp = livePrice >= lastCandle.open;
     const lineColor = isLiveUp ? BULL : BEAR;
 
-    // Subtle horizontal band
-    const bandGrad = ctx.createLinearGradient(0, lastY - 30, 0, lastY + 30);
-    bandGrad.addColorStop(0, isLiveUp ? 'rgba(38,166,154,0)' : 'rgba(239,83,84,0)');
-    bandGrad.addColorStop(0.5, isLiveUp ? 'rgba(38,166,154,0.05)' : 'rgba(239,83,84,0.05)');
-    bandGrad.addColorStop(1, isLiveUp ? 'rgba(38,166,154,0)' : 'rgba(239,83,84,0)');
-    ctx.fillStyle = bandGrad;
-    ctx.fillRect(innerLeft, lastY - 30, innerW, 60);
-
     // Dashed price line
-    ctx.setLineDash([3, 3]);
+    ctx.setLineDash([2, 4]);
     ctx.strokeStyle = lineColor;
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -298,19 +251,39 @@ const CandlestickChart = ({
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Price label on right (Binance style)
-    const priceLabel = formatPrice(livePrice);
-    ctx.font = 'bold 11px ui-monospace, "SF Mono", Menlo, Consolas, monospace';
-    const plW = Math.round(ctx.measureText(priceLabel).width) + 10;
-    const plH = 20;
+    // Price label on right (pill shape)
+    // Extra decimals for live price look
+    const priceLabel = formatPrice(livePrice) + (livePrice % 1 === 0 ? '.0000000' : '000').slice(0, 7 - (livePrice.toString().split('.')[1]?.length || 0));
+    ctx.font = '11px ui-monospace, "SF Mono", Menlo, Consolas, monospace';
+    const plW = Math.round(ctx.measureText(priceLabel).width) + 16;
+    const plH = 22;
     const plX = innerRight + 1;
     const plY = Math.round(lastY - plH / 2);
-    ctx.fillStyle = lineColor;
-    ctx.fillRect(plX, plY, plW, plH);
+    
+    ctx.fillStyle = 'rgba(30, 35, 45, 0.9)'; // Dark pill matching image
+    ctx.beginPath();
+    ctx.roundRect(plX, plY, plW, plH, 6);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(100, 110, 120, 0.5)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(plX, plY, plW, plH);
+
     ctx.fillStyle = '#fff';
-    ctx.textAlign = 'left';
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(priceLabel, plX + 5, lastY);
+    ctx.fillText(priceLabel, plX + plW / 2, lastY);
+
+    // Countdown semi-circle above the label
+    const arcX = plX + plW / 2;
+    const arcY = plY - 14;
+    ctx.beginPath();
+    ctx.arc(arcX, arcY, 10, -Math.PI / 2, Math.PI * 0.7, false);
+    ctx.strokeStyle = 'rgba(200, 200, 210, 0.8)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(200, 200, 210, 0.8)';
+    ctx.font = '9px ui-monospace, "SF Mono", monospace';
+    ctx.fillText(':5', arcX + 2, arcY);
 
     /* ── Active trade entry lines ─────────────────────────────── */
     activeTrades.forEach(trade => {
@@ -619,7 +592,7 @@ const TradingDashboard: React.FC<{
       const sym = SYMBOL_MAP[asset.id] ?? 'BTC/INR';
       setPrice(getLivePrice(sym));
       setCandles(getLiveCandles(sym, 60));
-    }, 800);
+    }, 200);
     return () => clearInterval(iv);
   }, [asset]);
 

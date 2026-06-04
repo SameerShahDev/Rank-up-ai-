@@ -141,7 +141,7 @@ const _buffer:     Record<string, Candle[]>  = {};
 const _headIdx:    Record<string, number>    = {};
 const _liveCandle: Record<string, Candle>    = {};
 const _tickCount:  Record<string, number>    = {};
-const TICKS_PER_CANDLE = 60; // 60 × 1000ms = 60s per candle — smooth minute candle
+const TICKS_PER_CANDLE = 15; // Make candles form much faster (15 ticks per candle)
 
 // ─── localStorage persistence ─────────────────────────────────────────────
 const STORAGE_PREFIX = 'tryonetrade_market_';
@@ -306,7 +306,7 @@ export function tickPrices(): void {
     const bodySize = Math.abs(nextCandle.close - nextCandle.open);
     const bodyRatio = bodySize / (candleRange || 1);
     const isChoppy = bodyRatio < 0.2;
-    const noiseMultiplier = isChoppy ? 3.0 : 1.8; // reduced from 8.0/5.0
+    const noiseMultiplier = isChoppy ? 8.0 : 5.0; // Increased noise for more movement
 
     // Smoothly build live candle tick-by-tick toward nextCandle's close
     const progress = tc / TICKS_PER_CANDLE;
@@ -318,15 +318,15 @@ export function tickPrices(): void {
       tickMove += candleRange * (Math.random() - 0.5) * 0.4;
     }
 
-    // Occasional spike (10% chance, reduced from 30%)
-    if (Math.random() < 0.10) {
+    // Occasional spike (30% chance)
+    if (Math.random() < 0.30) {
       const spikeDir  = Math.random() > 0.5 ? 1 : -1;
       const spikeSize = nextCandle.close * (0.005 + Math.random() * 0.015);
       tickMove += spikeDir * spikeSize;
     }
 
-    // Mega spike very rare (2% chance, reduced from 8%)
-    if (Math.random() < 0.02) {
+    // Mega spike (8% chance)
+    if (Math.random() < 0.08) {
       const spikeDir  = Math.random() > 0.5 ? 1 : -1;
       tickMove += spikeDir * nextCandle.close * (0.02 + Math.random() * 0.03);
     }
