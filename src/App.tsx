@@ -7,6 +7,7 @@ import TradingDashboard from './components/TradingDashboard';
 import TransactionHistory from './components/TransactionHistory';
 import SettingsPanel from './components/SettingsPanel';
 import AuthFlow from './components/auth/AuthFlow';
+import TradingChartDemo from './components/TradingChartDemo';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { WITHDRAWAL_LIMIT } from './types/account';
 import type { UserProfile } from './types/profile';
@@ -27,6 +28,16 @@ const TAB_TITLES: Record<string, string> = {
 };
 
 function AppShell() {
+  // Standalone chart preview: visit /?chart=1
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("chart") === "1") {
+    return (
+      <div className="h-[100dvh] w-full bg-[#1a1a2e]">
+        <TradingChartDemo />
+      </div>
+    );
+  }
+
   const {
     isLoading,
     isAuthenticated,
