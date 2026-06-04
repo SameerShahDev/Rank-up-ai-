@@ -605,7 +605,7 @@ const TradingDashboard: React.FC<{
 
   const [asset, setAsset] = useState(ASSETS[0]);
   const [amount, setAmount] = useState(100);
-  const [duration, setDuration] = useState(60);
+  const [duration, setDuration] = useState(3);
   const [tf, setTf] = useState('1m');
   const [sentiment, setSentiment] = useState(55);
   const [activeTrades, setActiveTrades] = useState<ActiveTrade[]>([]);
@@ -833,7 +833,25 @@ const TradingDashboard: React.FC<{
           </div>
         )}
 
-        {/* Amount & Time */}
+        {/* Duration Presets */}
+        <div className="flex gap-1 mb-1.5">
+          {[3, 5, 10, 30, 60].map(d => (
+            <button
+              key={d}
+              type="button"
+              onClick={() => setDuration(d)}
+              className="flex-1 h-7 rounded-md text-[10px] font-bold transition-all"
+              style={duration === d
+                ? { background: 'rgba(59,130,246,0.2)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.5)' }
+                : { background: C.surface, color: '#64748b', border: '1px solid rgba(56,70,90,0.4)' }
+              }
+            >
+              {d}s
+            </button>
+          ))}
+        </div>
+
+        {/* Amount */}
         <div className="flex gap-1.5 mb-1.5">
           <div className="flex-1 flex items-center h-8 rounded-md overflow-hidden" style={{ background: C.surface, border: '1px solid rgba(56,70,90,0.4)' }}>
             <button type="button" onClick={() => setAmount(a => Math.max(100, a - 100))}
@@ -844,19 +862,6 @@ const TradingDashboard: React.FC<{
               <span className="text-[12px] font-black text-white tabular-nums">₹{amount}</span>
             </div>
             <button type="button" onClick={() => setAmount(a => a + 100)}
-              className="w-7 h-full flex items-center justify-center active:bg-white/5">
-              <Plus className="w-3 h-3 text-slate-500" />
-            </button>
-          </div>
-          <div className="flex-1 flex items-center h-8 rounded-md overflow-hidden" style={{ background: C.surface, border: '1px solid rgba(56,70,90,0.4)' }}>
-            <button type="button" onClick={() => setDuration(d => Math.max(10, d - 10))}
-              className="w-7 h-full flex items-center justify-center active:bg-white/5">
-              <Minus className="w-3 h-3 text-slate-500" />
-            </button>
-            <div className="flex-1 flex items-center justify-center">
-              <span className="text-[12px] font-black text-white tabular-nums">{formatTime(duration)}</span>
-            </div>
-            <button type="button" onClick={() => setDuration(d => d + 10)}
               className="w-7 h-full flex items-center justify-center active:bg-white/5">
               <Plus className="w-3 h-3 text-slate-500" />
             </button>
