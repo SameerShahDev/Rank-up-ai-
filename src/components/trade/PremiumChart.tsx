@@ -278,7 +278,8 @@ const PremiumChart: React.FC<PremiumChartProps> = ({
   
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     const W = container.clientWidth || 800;
