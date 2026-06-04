@@ -13,41 +13,71 @@ const TF_CANDLE_COUNT: Record<Timeframe, number> = {
 function CandlestickChart({ candles, livePrice }: { candles: Candle[]; livePrice: number }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [crosshair, setCrosshair] = useState<{ x: number; y: number; price: number; time: string } | null>(null);
+  const [crosshair, setCrosshair] = useState<{ x: number; y: number; price: number; time: string; candle: Candle | null } | null>(null);
 
-  const W = 340, H = 290, PAD = { top: 10, right: 60, bottom: 30, left: 55 };
-  const VOL_H = 40; // volume section height
+  const W = 360, H = 320, PAD = { top: 10, right: 60, bottom: 30, left: 55 };
+  const VOL_H = 36;
   const chartW = W - PAD.left - PAD.right;
   const candleH = H - PAD.top - PAD.bottom - VOL_H - 4;
 
+  // Bollinger Bands calculation
+  const calcBB = (data: number[], period = 20, stdDev = 2) => {
+    const upper: (number | null)[] = [];
+    const lower: (number | null)[] = [];
+    const middle: (number | null)[] = [];
+    for (let i = 0; i < data.length; i++) {
+      if (i < period - 1) { upper.push(null); lower.push(null); middle.push(null); continue; }
+      let sum = 0;
+      for (let j = i - period + 1; j <= i; j++) sum += data[j];
+      const avg = sum / period;
+      let sqSum = 0;
+      for (let j = i - period + 1; j <= i; j++) sqSum += (data[j] - avg) ** 2;
+      const std = Math.sqrt(sqSum / period);
+      middle.push(avg);
+      upper.push(avg + stdDev * std);
+      lower.push(avg - stdDev * std);
+    }
+    return { upper, middle, lower };
+  };
+
   if (!candles.length) return <div className="h-44 bg-gray-800 rounded-2xl animate-pulse" />;
 
+  const closes = candles.map(c => c.close);
   const highs = candles.map(c => c.high);
-  const lows  = candles.map(c => c.low);
-  const maxP  = Math.max(...highs, livePrice);
-  const minP  = Math.min(...lows,  livePrice);
+  const lows = candles.map(c => c.low);
+  const maxP = Math.max(...highs, livePrice);
+  const minP = Math.min(...lows, livePrice);
   const range = maxP - minP || 1;
   const volMax = Math.max(...candles.map(c => c.volume), 1);
 
   const toY = (p: number) => PAD.top + ((maxP - p) / range) * candleH;
   const barW = Math.max(2, (chartW / candles.length) - 0.5);
 
-  // Moving averages
-  const ma = (period: number) => {
-    const vals: (number | null)[] = [];
-    for (let i = 0; i < candles.length; i++) {
-      if (i < period - 1) { vals.push(null); continue; }
-      let sum = 0;
-      for (let j = i - period + 1; j <= i; j++) sum += candles[j].close;
-      vals.push(sum / period);
+  // EMA calculation
+  const calcEMA = (data: number[], period: number) => {
+    const result: (number | null)[] = [];
+    const k = 2 / (period + 1);
+    let ema: number | null = null;
+    for (let i = 0; i < data.length; i++) {
+      if (i < period - 1) { result.push(null); }
+      else if (i === period - 1) {
+        let sum = 0;
+        for (let j = 0; j < period; j++) sum += data[j];
+        ema = sum / period;
+        result.push(ema);
+      } else {
+        ema = data[i] * k + (ema as number) * (1 - k);
+        result.push(ema);
+      }
     }
-    return vals;
+    return result;
   };
-  const ma7 = ma(7);
-  const ma25 = ma(25);
 
-  // Build MA path data
-  const maPath = (vals: (number | null)[]) => {
+  const ema7 = calcEMA(closes, 7);
+  const ema25 = calcEMA(closes, 25);
+  const bb = calcBB(closes, 20, 2);
+
+  const buildPath = (vals: (number | null)[]) => {
     let d = '';
     for (let i = 0; i < vals.length; i++) {
       if (vals[i] === null) continue;
@@ -58,14 +88,35 @@ function CandlestickChart({ candles, livePrice }: { candles: Candle[]; livePrice
     return d;
   };
 
-  // Price labels
-  const priceSteps = 4;
+  // Build Bollinger fill path
+  const buildBBFill = () => {
+    let d = '';
+    let started = false;
+    for (let i = 0; i < bb.upper.length; i++) {
+      if (bb.upper[i] === null) continue;
+      const x = PAD.left + (i / (candles.length - 1)) * chartW;
+      const y = toY(bb.upper[i]!);
+      d += (started ? 'L' : 'M') + x.toFixed(1) + ',' + y.toFixed(1);
+      started = true;
+    }
+    for (let i = bb.lower.length - 1; i >= 0; i--) {
+      if (bb.lower[i] === null) continue;
+      const x = PAD.left + (i / (candles.length - 1)) * chartW;
+      const y = toY(bb.lower[i]!);
+      d += 'L' + x.toFixed(1) + ',' + y.toFixed(1);
+    }
+    d += 'Z';
+    return d;
+  };
+
+  const priceSteps = 5;
   const priceLabels = Array.from({ length: priceSteps + 1 }, (_, i) => {
     const p = minP + (range * i) / priceSteps;
     return { y: toY(p), label: p >= 1000 ? `${(p / 1000).toFixed(1)}k` : p.toFixed(p < 10 ? 4 : 2) };
   });
 
-  // Crosshair handler
+  const fmtP = (p: number) => p >= 1000 ? p.toFixed(0) : p < 1 ? p.toFixed(4) : p.toFixed(2);
+
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
     const svg = svgRef.current;
     if (!svg) return;
@@ -80,7 +131,8 @@ function CandlestickChart({ candles, livePrice }: { candles: Candle[]; livePrice
     }
     const pct = (svgX - PAD.left) / chartW;
     const idx = Math.round(pct * (candles.length - 1));
-    const c = candles[Math.min(idx, candles.length - 1)];
+    const ci = Math.min(idx, candles.length - 1);
+    const c = candles[ci];
     const priceAtX = maxP - ((svgY - PAD.top) / candleH) * range;
     const d = new Date(c.time);
     setCrosshair({
@@ -88,30 +140,42 @@ function CandlestickChart({ candles, livePrice }: { candles: Candle[]; livePrice
       y: svgY,
       price: priceAtX,
       time: `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`,
+      candle: c,
     });
   };
   const handleMouseLeave = () => setCrosshair(null);
 
-  const fmtP = (p: number) => p >= 1000 ? p.toFixed(0) : p < 1 ? p.toFixed(4) : p.toFixed(2);
+  const lastCandle = candles[candles.length - 1];
+  const isUp = lastCandle.close >= lastCandle.open;
 
   return (
-    <div ref={containerRef} className="relative bg-gray-800/50 rounded-2xl border border-gray-700/50 overflow-hidden">
-      {/* MA legend */}
-      <div className="absolute top-2 left-2 flex gap-3 text-[10px] z-10 font-mono">
-        <span className="text-blue-400/80">MA7</span>
-        <span className="text-orange-400/80">MA25</span>
+    <div ref={containerRef} className="relative bg-[#080c14] rounded-2xl border border-white/[0.06] overflow-hidden">
+      {/* Legend bar */}
+      <div className="absolute top-2 left-2 z-10 flex items-center gap-3 text-[9px] font-mono">
+        <span className="text-blue-400/90">EMA7 <span className="text-blue-400/60 font-bold">{fmtP(closes[closes.length - 1])}</span></span>
+        <span className="text-purple-400/90">EMA25</span>
+        <span className="text-blue-300/50">BB(20,2)</span>
       </div>
       {/* Live price badge */}
-      <div className="absolute top-2 right-2 z-10 bg-blue-500/20 border border-blue-500/30 px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold text-blue-400">
-        {fmtP(livePrice)}
+      <div className="absolute top-2 right-2 z-10 flex items-center gap-2 px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold"
+        style={{ background: isUp ? 'rgba(0,230,118,0.12)' : 'rgba(255,23,68,0.12)', border: `1px solid ${isUp ? 'rgba(0,230,118,0.25)' : 'rgba(255,23,68,0.25)'}`, color: isUp ? '#00e676' : '#ff1744' }}>
+        <span>{fmtP(livePrice)}</span>
       </div>
 
       <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="w-full cursor-crosshair"
-        style={{ height: 290 }} onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}>
+        style={{ height: 320 }} onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}>
         <defs>
-          <linearGradient id="volGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.05" />
+          <linearGradient id="volGradBull" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#00e676" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="#00e676" stopOpacity="0.04" />
+          </linearGradient>
+          <linearGradient id="volGradBear" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#ff1744" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="#ff1744" stopOpacity="0.04" />
+          </linearGradient>
+          <linearGradient id="bbGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="rgba(33,150,243,0.12)" />
+            <stop offset="100%" stopColor="rgba(33,150,243,0.12)" />
           </linearGradient>
         </defs>
 
@@ -119,31 +183,45 @@ function CandlestickChart({ candles, livePrice }: { candles: Candle[]; livePrice
         {priceLabels.map((pl, i) => (
           <g key={i}>
             <line x1={PAD.left} y1={pl.y} x2={W - PAD.right} y2={pl.y}
-              stroke="#374151" strokeWidth="0.5" strokeDasharray="3,3" />
+              stroke="rgba(255,255,255,0.035)" strokeWidth="0.5" strokeDasharray="3,4" />
             <text x={PAD.left - 6} y={pl.y + 3} textAnchor="end"
-              fontSize="7" fill="#6B7280" fontFamily="monospace">{pl.label}</text>
+              fontSize="7" fill="rgba(148,163,184,0.5)" fontFamily="'SF Mono', ui-monospace, monospace">{pl.label}</text>
           </g>
         ))}
 
+        {/* Vertical grid lines */}
+        {[0.25, 0.5, 0.75].map(pct => {
+          const x = PAD.left + chartW * pct;
+          return (
+            <line key={pct} x1={x} y1={PAD.top} x2={x} y2={PAD.top + candleH + VOL_H + 4}
+              stroke="rgba(255,255,255,0.025)" strokeWidth="0.5" strokeDasharray="3,4" />
+          );
+        })}
+
         {/* Separator line for volume */}
         <line x1={PAD.left} y1={PAD.top + candleH + 2} x2={W - PAD.right} y2={PAD.top + candleH + 2}
-          stroke="#374151" strokeWidth="0.5" />
+          stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
+
+        {/* Bollinger Bands fill */}
+        <path d={buildBBFill()} fill="url(#bbGrad)" />
+        {/* Bollinger upper band */}
+        <path d={buildPath(bb.upper)} fill="none" stroke="rgba(33,150,243,0.25)" strokeWidth="0.8" strokeDasharray="4,4" />
+        {/* Bollinger lower band */}
+        <path d={buildPath(bb.lower)} fill="none" stroke="rgba(33,150,243,0.25)" strokeWidth="0.8" strokeDasharray="4,4" />
 
         {/* Candles */}
         {candles.map((c, i) => {
-          const x   = PAD.left + (i / (candles.length - 1)) * chartW;
-          const isUp = c.close >= c.open;
-          const col  = isUp ? '#22c55e' : '#ef4444';
+          const x = PAD.left + (i / (candles.length - 1)) * chartW;
+          const up = c.close >= c.open;
+          const col = up ? '#00e676' : '#ff1744';
           const bodyTop = toY(Math.max(c.open, c.close));
-          const bodyH   = Math.max(1, Math.abs(toY(c.open) - toY(c.close)));
+          const bodyH = Math.max(1, Math.abs(toY(c.open) - toY(c.close)));
           return (
             <g key={i}>
-              {/* Wick */}
               <line x1={x} y1={toY(c.high)} x2={x} y2={toY(c.low)}
-                stroke={col} strokeWidth="1" opacity="0.6" />
-              {/* Body */}
+                stroke={col} strokeWidth="1" opacity="0.5" />
               <rect x={x - barW / 2} y={bodyTop} width={barW} height={bodyH}
-                fill={col} rx={barW > 3 ? 1 : 0} opacity={isUp ? 0.9 : 0.85} />
+                fill={col} rx={barW > 3 ? 1 : 0} opacity={up ? 0.9 : 0.85} />
             </g>
           );
         })}
@@ -151,43 +229,51 @@ function CandlestickChart({ candles, livePrice }: { candles: Candle[]; livePrice
         {/* Volume bars */}
         {candles.map((c, i) => {
           const x = PAD.left + (i / (candles.length - 1)) * chartW;
-          const isUp = c.close >= c.open;
-          const col = isUp ? '#22c55e' : '#ef4444';
+          const up = c.close >= c.open;
           const vh = Math.max(1, ((c.volume / volMax) * VOL_H));
           return (
             <rect key={'v' + i} x={x - barW / 2} y={PAD.top + candleH + 4 + VOL_H - vh}
-              width={barW} height={vh} fill={col} opacity={0.25} rx={0.5}
+              width={barW} height={vh} fill={up ? 'url(#volGradBull)' : 'url(#volGradBear)'} rx={0.5}
             />
           );
         })}
 
-        {/* MA7 line */}
-        <path d={maPath(ma7)} fill="none" stroke="#60a5fa" strokeWidth="1.2" opacity="0.8" />
-        {/* MA25 line */}
-        <path d={maPath(ma25)} fill="none" stroke="#fb923c" strokeWidth="1.2" opacity="0.8" strokeDasharray="3,2" />
+        {/* EMA7 line */}
+        <path d={buildPath(ema7)} fill="none" stroke="#ff9800" strokeWidth="1.2" opacity="0.85" />
+        {/* EMA25 line */}
+        <path d={buildPath(ema25)} fill="none" stroke="#7c4dff" strokeWidth="1.2" opacity="0.85" strokeDasharray="4,3" />
 
         {/* Live price horizontal line */}
         <line x1={PAD.left} y1={toY(livePrice)} x2={W - PAD.right} y2={toY(livePrice)}
-          stroke="#3b82f6" strokeWidth="0.6" strokeDasharray="4,3" opacity="0.6" />
+          stroke={isUp ? '#00e676' : '#ff1744'} strokeWidth="0.5" strokeDasharray="5,4" opacity="0.5" />
 
         {/* Crosshair */}
-        {crosshair && (
+        {crosshair && crosshair.candle && (
           <g>
             <line x1={PAD.left} y1={crosshair.y} x2={W - PAD.right} y2={crosshair.y}
-              stroke="#6b7280" strokeWidth="0.5" strokeDasharray="2,2" opacity="0.5" />
+              stroke="rgba(148,163,184,0.2)" strokeWidth="0.5" strokeDasharray="3,3" opacity="0.7" />
             <line x1={crosshair.x} y1={PAD.top} x2={crosshair.x} y2={PAD.top + candleH + VOL_H + 4}
-              stroke="#6b7280" strokeWidth="0.5" strokeDasharray="2,2" opacity="0.5" />
-            {/* Price tooltip */}
-            <rect x={W - PAD.right + 2} y={crosshair.y - 7} width={PAD.right - 4} height={14}
-              fill="#1f2937" rx="3" stroke="#4b5563" strokeWidth="0.5" />
-            <text x={W - PAD.right + 4} y={crosshair.y + 3} fontSize="7" fill="#e5e7eb" fontFamily="monospace" fontWeight="bold">
-              {fmtP(crosshair.price)}
-            </text>
-            {/* Time tooltip */}
-            <rect x={crosshair.x - 18} y={PAD.top + candleH + VOL_H + 6} width={36} height={14}
-              fill="#1f2937" rx="3" stroke="#4b5563" strokeWidth="0.5" />
-            <text x={crosshair.x} y={PAD.top + candleH + VOL_H + 16} fontSize="7" fill="#e5e7eb"
-              fontFamily="monospace" textAnchor="middle">{crosshair.time}</text>
+              stroke="rgba(148,163,184,0.2)" strokeWidth="0.5" strokeDasharray="3,3" opacity="0.7" />
+            {/* Candle highlight */}
+            <rect x={crosshair.x - barW / 2 - 1} y={PAD.top} width={barW + 2} height={candleH}
+              fill="none" stroke="rgba(148,163,184,0.15)" strokeWidth="0.5" rx={1} />
+            {/* OHLC Tooltip */}
+            <rect x={crosshair.x + 12} y={PAD.top + 8} width={100} height={82}
+              fill="rgba(15,23,42,0.95)" rx="5" stroke={crosshair.candle.close >= crosshair.candle.open ? 'rgba(0,230,118,0.2)' : 'rgba(255,23,68,0.2)'} strokeWidth="0.5" />
+            <line x1={crosshair.x + 13} y1={PAD.top + 10} x2={crosshair.x + 111} y2={PAD.top + 10}
+              stroke={crosshair.candle.close >= crosshair.candle.open ? '#00e676' : '#ff1744'} strokeWidth="1.5" />
+            <text x={crosshair.x + 17} y={PAD.top + 15} fontSize="6.5" fill="rgba(148,163,184,0.6)" fontFamily="'SF Mono', monospace">{crosshair.time}</text>
+            {(['O', 'H', 'L', 'C'] as const).map((label, j) => {
+              const val = crosshair.candle![label.toLowerCase() as keyof typeof crosshair.candle] as number;
+              const isLast = j === 3;
+              const color = label === 'H' ? '#00e676' : label === 'L' ? '#ff1744' : label === 'C' ? (crosshair.candle!.close >= crosshair.candle!.open ? '#00e676' : '#ff1744') : 'rgba(203,213,225,0.85)';
+              return (
+                <g key={label}>
+                  <text x={crosshair.x + 17} y={PAD.top + 26 + j * 14} fontSize="6.5" fill="rgba(148,163,184,0.5)" fontFamily="'SF Mono', monospace">{label}</text>
+                  <text x={crosshair.x + 34} y={PAD.top + 26 + j * 14} fontSize="6.5" fill={color} fontFamily="'SF Mono', monospace" fontWeight="bold">{fmtP(val)}</text>
+                </g>
+              );
+            })}
           </g>
         )}
       </svg>
@@ -201,13 +287,14 @@ function OrderBookRow({ price, amount, total, side, maxTotal }: {
 }) {
   const pct = Math.min((total / maxTotal) * 100, 100);
   const fmt = (n: number) => n >= 1000 ? n.toFixed(0) : n < 1 ? n.toFixed(4) : n.toFixed(2);
+  const isBid = side === 'bid';
   return (
-    <div className="relative flex justify-between text-xs py-0.5 px-1 cursor-pointer hover:bg-gray-700/30 transition-colors">
-      <div className={`absolute inset-y-0 ${side === 'bid' ? 'right-0' : 'left-0'} opacity-15 ${side === 'bid' ? 'bg-green-500' : 'bg-red-500'}`}
-        style={{ width: `${pct}%` }} />
-      <span className={side === 'bid' ? 'text-green-400' : 'text-red-400'}>{fmt(price)}</span>
-      <span className="text-gray-300">{amount.toFixed(4)}</span>
-      <span className="text-gray-400">{fmt(total)}</span>
+    <div className="relative flex justify-between text-[11px] py-1 px-2 cursor-pointer hover:bg-white/[0.03] transition-colors font-mono">
+      <div className={`absolute inset-y-0 ${isBid ? 'right-0' : 'left-0'} transition-all duration-300`}
+        style={{ width: `${pct}%`, background: isBid ? 'rgba(0,230,118,0.08)' : 'rgba(255,23,68,0.08)' }} />
+      <span className={`relative z-10 font-bold ${isBid ? 'text-[#00e676]' : 'text-[#ff1744]'}`}>{fmt(price)}</span>
+      <span className="relative z-10 text-white/80">{amount.toFixed(4)}</span>
+      <span className="relative z-10 text-white/50">{fmt(total)}</span>
     </div>
   );
 }
