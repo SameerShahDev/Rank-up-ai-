@@ -174,8 +174,19 @@ const ChartCanvas: React.FC<ChartProps> = ({ candles, livePrice, trades, activeT
   // Animation
   const pulse = useRef(0);
   const raf = useRef(0);
-  // Drag
-  const drag = useRef({ on: false, x0: 0, r0: { s: 0, e: 0 } });
+  // Drag state (smooth sub-candle precision + momentum)
+  const drag = useRef({
+    on: false,
+    x0: 0,
+    offset0: 0,       // fractional candle offset for smooth panning
+    vel: 0,           // velocity for momentum
+    lastX: 0,
+    lastT: 0,
+  });
+  // Fractional offset for sub-candle smooth panning
+  const offsetRef = useRef(0);
+  // Touch pinch state
+  const pinch = useRef({ active: false, dist0: 0, count0: 0 });
 
   /* ── Animation loop ─────────────────────────────────────────────── */
   useEffect(() => {
@@ -205,32 +216,56 @@ const ChartCanvas: React.FC<ChartProps> = ({ candles, livePrice, trades, activeT
     });
   }, [candles.length]);
 
-  /* ── Wheel zoom / scroll ────────────────────────────────────────── */
+  /* ── Wheel: scroll = zoom, shift+scroll = pan ───────────────────── */
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
     const handler = (e: WheelEvent) => {
       e.preventDefault();
+      const isZoom = !e.shiftKey; // default scroll = zoom
       setRange(p => {
         const n = p.e - p.s + 1;
-        if (e.ctrlKey || e.metaKey) {
+        if (isZoom) {
+          // Zoom toward cursor position
+          const rect = el.getBoundingClientRect();
+          const mouseX = e.clientX - rect.left;
+          const PW = 60;
+          const cR = rect.width - PW;
+          const ratio = Math.min(1, Math.max(0, mouseX / cR));
+          const delta = e.deltaY > 0 ? 3 : -3;
+          const nn = Math.max(12, Math.min(candles.length, n + delta));
+          const shrink = n - nn;
+          const sOff = Math.round(shrink * ratio);
+          const eOff = shrink - sOff;
+          return {
+            s: Math.max(0, p.s + sOff),
+            e: Math.min(candles.length - 1, p.e - eOff),
+          };
+        } else {
+          // Pan horizontally
           const d = e.deltaY > 0 ? 4 : -4;
-          const nn = Math.max(18, Math.min(candles.length, n + d));
-          return { s: Math.max(0, p.e - nn + 1), e: p.e };
+          const ns = Math.max(0, Math.min(candles.length - n, p.s + d));
+          return { s: ns, e: ns + n - 1 };
         }
-        const d = e.deltaY > 0 ? 3 : -3;
-        const ns = Math.max(0, Math.min(candles.length - n, p.s + d));
-        return { s: ns, e: ns + n - 1 };
       });
     };
     el.addEventListener("wheel", handler, { passive: false });
     return () => el.removeEventListener("wheel", handler);
   }, [candles.length]);
 
-  /* ── Mouse handlers ─────────────────────────────────────────────── */
+  /* ── Mouse handlers — smooth drag + momentum ────────────────────── */
   const onDown = (e: React.MouseEvent) => {
-    drag.current = { on: true, x0: e.clientX, r0: { ...range } };
+    const n = range.e - range.s + 1;
+    drag.current = {
+      on: true,
+      x0: e.clientX,
+      offset0: offsetRef.current,
+      vel: 0,
+      lastX: e.clientX,
+      lastT: performance.now(),
+    };
   };
+
   const onMove = (e: React.MouseEvent) => {
     const wrap = wrapRef.current;
     if (!wrap || !candles.length) return;
@@ -239,59 +274,139 @@ const ChartCanvas: React.FC<ChartProps> = ({ candles, livePrice, trades, activeT
     const my = e.clientY - rect.top;
 
     if (drag.current.on) {
+      const PW = 60;
+      const cR = rect.width - PW;
+      const n = range.e - range.s + 1;
+      const slotW = cR / n;
       const dx = e.clientX - drag.current.x0;
-      const slotW = rect.width / (drag.current.r0.e - drag.current.r0.s + 1);
-      const shift = Math.round(dx / slotW);
-      const n = drag.current.r0.e - drag.current.r0.s + 1;
-      const ns = Math.max(0, Math.min(candles.length - n, drag.current.r0.s - shift));
+      const newOffset = drag.current.offset0 + dx / slotW;
+
+      // Track velocity for momentum
+      const now = performance.now();
+      const dt = now - drag.current.lastT;
+      if (dt > 0) {
+        drag.current.vel = (e.clientX - drag.current.lastX) / dt;
+      }
+      drag.current.lastX = e.clientX;
+      drag.current.lastT = now;
+
+      // Apply offset as fractional scroll
+      const shift = Math.floor(newOffset);
+      offsetRef.current = newOffset - shift;
+      const ns = Math.max(0, Math.min(candles.length - n, range.s - shift));
       setRange({ s: ns, e: ns + n - 1 });
       setMv(null);
       return;
     }
 
-    const PW = 60;
-    const cR = rect.width - PW;
-    const n = range.e - range.s + 1;
-    const slot = cR / n;
-    const idx = Math.floor(mx / slot);
+    // Hover
+    const idx = Math.floor(mx / (cR / n));
     if (idx >= 0 && idx < n && mx <= cR) {
       setMv({ x: mx, y: my, i: idx });
     } else {
       setMv(null);
     }
   };
-  const onUp = () => { drag.current.on = false; };
+
+  const onUp = () => {
+    if (!drag.current.on) return;
+    // Apply momentum
+    const vel = drag.current.vel;
+    drag.current.on = false;
+    if (Math.abs(vel) > 0.3) {
+      const n = range.e - range.s + 1;
+      const momentum = Math.round(vel * 8);
+      setRange(p => {
+        const ns = Math.max(0, Math.min(candles.length - n, p.s - momentum));
+        return { s: ns, e: ns + n - 1 };
+      });
+    }
+  };
+
   const onLeave = () => { drag.current.on = false; setMv(null); };
 
-  /* ── Touch handlers ─────────────────────────────────────────────── */
+  /* ── Touch handlers — drag + pinch-to-zoom ──────────────────────── */
   const tStart = (e: React.TouchEvent) => {
-    drag.current = { on: true, x0: e.touches[0].clientX, r0: { ...range } };
+    if (e.touches.length === 2) {
+      // Pinch start
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      pinch.current = { active: true, dist0: Math.hypot(dx, dy), count0: range.e - range.s + 1 };
+      drag.current.on = false;
+      return;
+    }
+    drag.current = {
+      on: true,
+      x0: e.touches[0].clientX,
+      offset0: offsetRef.current,
+      vel: 0,
+      lastX: e.touches[0].clientX,
+      lastT: performance.now(),
+    };
   };
+
   const tMove = (e: React.TouchEvent) => {
     const wrap = wrapRef.current;
     if (!wrap || !candles.length) return;
-    const t = e.touches[0];
     const rect = wrap.getBoundingClientRect();
-    const mx = t.clientX - rect.left;
 
-    if (drag.current.on) {
-      const dx = t.clientX - drag.current.x0;
-      const slotW = rect.width / (drag.current.r0.e - drag.current.r0.s + 1);
-      const shift = Math.round(dx / slotW);
-      const n = drag.current.r0.e - drag.current.r0.s + 1;
-      const ns = Math.max(0, Math.min(candles.length - n, drag.current.r0.s - shift));
-      setRange({ s: ns, e: ns + n - 1 });
+    // Pinch zoom
+    if (pinch.current.active && e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.hypot(dx, dy);
+      const scale = pinch.current.dist0 / dist;
+      const newN = Math.max(12, Math.min(candles.length, Math.round(pinch.current.count0 * scale)));
+      const mid = (range.s + range.e) / 2;
+      const half = newN / 2;
+      const ns = Math.max(0, Math.min(candles.length - newN, Math.round(mid - half)));
+      setRange({ s: ns, e: ns + newN - 1 });
       return;
     }
-    const PW = 60;
-    const cR = rect.width - PW;
-    const n = range.e - range.s + 1;
-    const idx = Math.floor(mx / (cR / n));
-    if (idx >= 0 && idx < n && mx <= cR) {
-      setMv({ x: mx, y: t.clientY - rect.top, i: idx });
+
+    // Single finger drag
+    if (drag.current.on && e.touches.length === 1) {
+      const t = e.touches[0];
+      const PW = 60;
+      const cR = rect.width - PW;
+      const n = range.e - range.s + 1;
+      const slotW = cR / n;
+      const dx = t.clientX - drag.current.x0;
+      const newOffset = drag.current.offset0 + dx / slotW;
+
+      // Track velocity
+      const now = performance.now();
+      const dt = now - drag.current.lastT;
+      if (dt > 0) {
+        drag.current.vel = (t.clientX - drag.current.lastX) / dt;
+      }
+      drag.current.lastX = t.clientX;
+      drag.current.lastT = now;
+
+      const shift = Math.floor(newOffset);
+      offsetRef.current = newOffset - shift;
+      const ns = Math.max(0, Math.min(candles.length - n, range.s - shift));
+      setRange({ s: ns, e: ns + n - 1 });
     }
   };
-  const tEnd = () => { drag.current.on = false; setMv(null); };
+
+  const tEnd = (e: React.TouchEvent) => {
+    if (pinch.current.active) {
+      pinch.current.active = false;
+      return;
+    }
+    if (!drag.current.on) return;
+    const vel = drag.current.vel;
+    drag.current.on = false;
+    if (Math.abs(vel) > 0.3) {
+      const n = range.e - range.s + 1;
+      const momentum = Math.round(vel * 8);
+      setRange(p => {
+        const ns = Math.max(0, Math.min(candles.length - n, p.s - momentum));
+        return { s: ns, e: ns + n - 1 };
+      });
+    }
+  };
 
   /* ═══════════════════════════════════════════════════════════════════════
      RENDER
