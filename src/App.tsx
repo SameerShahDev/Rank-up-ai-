@@ -196,8 +196,6 @@ function AppShell() {
             balance={activeBalance}
             setBalance={setActiveBalance}
             realBalance={realBalance}
-            onDeposit={handleDeposit}
-            onWithdraw={handleWithdraw}
             addTransaction={addTransaction}
           />
         );

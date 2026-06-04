@@ -8,8 +8,6 @@ import {
 } from "lucide-react";
 import type { AccountMode } from '../types/account';
 import AccountToggle from './AccountToggle';
-import DepositModal from './DepositModal';
-import WithdrawModal from './WithdrawModal';
 import type { Candle } from '../utils/marketData';
 import { getLiveCandles, getLivePrice, tickPrices } from '../utils/marketData';
 
@@ -592,15 +590,11 @@ const TradingDashboard: React.FC<{
   balance: number;
   setBalance: React.Dispatch<React.SetStateAction<number>>;
   realBalance: number;
-  onDeposit: (amount: number, meta?: { orderId: string; utr?: string }) => void | Promise<void>;
-  onWithdraw: (amount: number) => void;
   addTransaction: (tx: Record<string, string>) => void;
 }> = ({
   accountMode, setAccountMode, balance, setBalance, realBalance,
-  onDeposit, onWithdraw, addTransaction,
+  addTransaction,
 }) => {
-  const [showDeposit, setShowDeposit] = useState(false);
-  const [showWithdraw, setShowWithdraw] = useState(false);
   const isDemo = accountMode === 'demo';
 
   const [asset, setAsset] = useState(ASSETS[0]);
@@ -718,32 +712,13 @@ const TradingDashboard: React.FC<{
       {/* ── Clean Top Section (Refactored) ───────────────────────── */}
       <div className="shrink-0 space-y-0" style={{ borderBottom: '1px solid rgba(56,70,90,0.25)' }}>
         
-        {/* Row 1: Balance & Account Controls + Price Display */}
+        {/* Row 1: Balance & Account Controls */}
         <div className="flex items-center justify-between px-3 py-2">
           <div className="flex items-center gap-2">
             <AccountToggle mode={accountMode} onChange={setAccountMode} compact />
             <span className={`text-[11px] font-black tabular-nums px-2.5 py-1 rounded-md ${isDemo ? 'text-amber-400' : 'text-white'}`} style={{ background: 'rgba(10,14,23,0.85)', border: '1px solid rgba(56,70,90,0.3)' }}>
               ₹{balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowDeposit(true)}
-              className="px-2 py-1 rounded-md text-[10px] font-bold"
-              style={{ background: 'rgba(38,166,154,0.12)', border: '1px solid rgba(38,166,154,0.25)', color: C.up }}
-            >
-              Deposit
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowWithdraw(true)}
-              className="px-2 py-1 rounded-md text-[10px] font-bold"
-              style={{ background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.25)', color: '#fbbf24' }}
-            >
-              Withdraw
-            </button>
           </div>
         </div>
 
@@ -962,21 +937,7 @@ const TradingDashboard: React.FC<{
         </div>
       )}
 
-      {/* ── Modals ──────────────────────────────────────────────── */}
-      {showDeposit && (
-        <DepositModal
-          onClose={() => setShowDeposit(false)}
-          onPaymentSuccess={async (amt, meta) => { await onDeposit(amt, meta); setAccountMode('real'); }}
-        />
-      )}
-      {showWithdraw && (
-        <WithdrawModal
-          balance={isDemo ? balance : realBalance}
-          accountMode={accountMode}
-          onClose={() => setShowWithdraw(false)}
-          onWithdraw={amt => { onWithdraw(amt); setShowWithdraw(false); }}
-        />
-      )}
+
 
       <style>{`
         @keyframes slideUp {
