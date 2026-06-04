@@ -15,7 +15,7 @@ interface Trade {
   timeLeft: number;
 }
 
-interface ChartProps {
+interface Props {
   candles: Candle[];
   livePrice: number;
   trades: Trade[];
@@ -29,8 +29,7 @@ interface HA { t: number; o: number; h: number; l: number; c: number }
 
 function heikinAshi(src: Candle[]): HA[] {
   if (!src.length) return [];
-  const out: HA[] = [];
-  out.push({ t: src[0].time, o: src[0].open, h: src[0].high, l: src[0].low, c: src[0].close });
+  const out: HA[] = [{ t: src[0].time, o: src[0].open, h: src[0].high, l: src[0].low, c: src[0].close }];
   for (let i = 1; i < src.length; i++) {
     const s = src[i], p = out[i - 1];
     const c = (s.open + s.high + s.low + s.close) / 4;
@@ -41,112 +40,50 @@ function heikinAshi(src: Candle[]): HA[] {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   DESIGN TOKENS
+   DESIGN TOKENS — TradingView-inspired dark theme
    ═══════════════════════════════════════════════════════════════════════════ */
-const T = {
-  // Backgrounds
-  bg:          "#111119",
-  bgTop:       "#16161f",
-  bgBot:       "#0d0d14",
+const C = {
+  bg:          "#131722",
+  bgTop:       "#1a1e2e",
+  bgBot:       "#0e121e",
 
-  // Grid
-  gridH:       "rgba(255,255,255,0.028)",
-  gridV:       "rgba(255,255,255,0.022)",
-  gridAxis:    "rgba(255,255,255,0.06)",
-
-  // Text
-  txtDim:      "rgba(120,130,160,0.35)",
-  txtMid:      "rgba(150,160,185,0.5)",
-  txtBright:   "rgba(200,210,225,0.8)",
+  gridMajor:   "rgba(255,255,255,0.035)",
+  gridMinor:   "rgba(255,255,255,0.018)",
+  axisLine:    "rgba(255,255,255,0.06)",
+  axisLabel:   "rgba(130,144,170,0.5)",
 
   // Bullish — vibrant neon green
-  bull:        "#00ff88",
-  bullBody:    "#00e676",
-  bullWick:    "rgba(0,255,136,0.7)",
-  bullGlow:    "rgba(0,255,136,0.04)",
-  bullFill:    "rgba(0,255,136,0.06)",
+  bullWick:    "#00ff88",
+  bullBody:    "#00ff88",
+  bullGlow:    "rgba(0,255,136,0.05)",
 
   // Bearish — muted red
-  bear:        "#e63946",
-  bearBody:    "#c62828",
-  bearWick:    "rgba(230,57,70,0.7)",
-  bearGlow:    "rgba(230,57,70,0.04)",
-  bearFill:    "rgba(230,57,70,0.06)",
+  bearWick:    "#ef5350",
+  bearBody:    "#ef5350",
+  bearGlow:    "rgba(239,83,80,0.05)",
 
-  // Entry
   entryLine:   "#00ff88",
   entryTag:    "#ffd60a",
 
-  // Timer
-  timerLine:   "#e63946",
+  timerLine:   "#e53935",
+  expireLine:  "#ff6b6b",
 
-  // Expire
-  expireLine:  "#ff5252",
+  crosshair:   "rgba(150,165,190,0.15)",
+  crossLabel:  "rgba(18,22,34,0.95)",
 
-  // Crosshair
-  cross:       "rgba(150,160,185,0.18)",
-
-  // Tooltip
-  tipBg:       "rgba(12,14,22,0.96)",
+  tipBg:       "rgba(18,22,34,0.97)",
   tipBorder:   "rgba(255,255,255,0.06)",
 
-  // Price tag
-  tagBg:       "#00ff88",
-  tagText:     "#111119",
-
-  // Live price
-  liveUp:      "#00ff88",
-  liveDown:    "#e63946",
+  liveGreen:   "#00ff88",
+  liveRed:     "#ef5350",
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   FORMATTERS
+   HELPERS
    ═══════════════════════════════════════════════════════════════════════════ */
-const fmt = {
-  price(v: number): string {
-    return v.toFixed(8);
-  },
-  axis(v: number): string {
-    if (v >= 1e6) return (v / 1e5).toFixed(1) + "L";
-    if (v >= 1e4) return (v / 1e3).toFixed(1) + "K";
-    if (v >= 1e3) return v.toFixed(1);
-    if (v >= 100) return v.toFixed(2);
-    if (v >= 1) return v.toFixed(3);
-    return v.toFixed(4);
-  },
-  time(ts: number): string {
-    const d = new Date(ts);
-    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  },
-  date(ts: number): string {
-    const d = new Date(ts);
-    return `${d.getDate()} ${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()]}`;
-  },
-  countdown(s: number): string {
-    const n = Math.max(0, Math.floor(s));
-    return `:${String(n).padStart(2, "0")}`;
-  },
-};
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   GRID STEP CALCULATOR
-   ═══════════════════════════════════════════════════════════════════════════ */
-function gridStep(range: number, target: number): number {
-  const rough = range / target;
-  const mag = 10 ** Math.floor(Math.log10(rough));
-  const n = rough / mag;
-  return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * mag;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   DRAW HELPERS
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-/** Snap to pixel for crisp 1px lines */
 const snap = (v: number) => Math.round(v) + 0.5;
 
-/** Rounded rect path */
-function rrect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.lineTo(x + w - r, y);
@@ -160,47 +97,63 @@ function rrect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h
   ctx.closePath();
 }
 
+function gridStep(range: number, target: number): number {
+  const rough = range / target;
+  const mag = 10 ** Math.floor(Math.log10(rough));
+  const n = rough / mag;
+  return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * mag;
+}
+
+const fmt = {
+  price(v: number) { return v.toFixed(8); },
+  axis(v: number) {
+    if (v >= 1e6) return (v / 1e6).toFixed(2) + "M";
+    if (v >= 1e3) return (v / 1e3).toFixed(1) + "K";
+    if (v >= 100) return v.toFixed(2);
+    if (v >= 1) return v.toFixed(3);
+    return v.toFixed(4);
+  },
+  time(ts: number) {
+    const d = new Date(ts);
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  },
+  date(ts: number) {
+    const d = new Date(ts);
+    return `${d.getDate()} ${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()]}`;
+  },
+  countdown(s: number) {
+    const n = Math.max(0, Math.floor(s));
+    return `:${String(n).padStart(2, "0")}`;
+  },
+};
+
 /* ═══════════════════════════════════════════════════════════════════════════
-   CHART CANVAS — MAIN COMPONENT
+   COMPONENT
    ═══════════════════════════════════════════════════════════════════════════ */
-const ChartCanvas: React.FC<ChartProps> = ({ candles, livePrice, trades, activeTrade }) => {
+const ChartCanvas: React.FC<Props> = ({ candles, livePrice, trades, activeTrade }) => {
   const wrapRef = useRef<HTMLDivElement>(null);
   const cvsRef = useRef<HTMLCanvasElement>(null);
 
-  // Viewport
   const [range, setRange] = useState({ s: 0, e: 0 });
-  // Hover
-  const [mv, setMv] = useState<{ x: number; y: number; i: number } | null>(null);
-  // Animation
+  const [hover, setHover] = useState<{ x: number; y: number; i: number } | null>(null);
+
   const pulse = useRef(0);
   const raf = useRef(0);
-  // Drag state (smooth sub-candle precision + momentum)
-  const drag = useRef({
-    on: false,
-    x0: 0,
-    offset0: 0,       // fractional candle offset for smooth panning
-    vel: 0,           // velocity for momentum
-    lastX: 0,
-    lastT: 0,
-  });
-  // Fractional offset for sub-candle smooth panning
-  const offsetRef = useRef(0);
-  // Touch pinch state
-  const pinch = useRef({ active: false, dist0: 0, count0: 0 });
+  const drag = useRef({ on: false, x0: 0, o0: 0, vx: 0, lx: 0, lt: 0 });
+  const offset = useRef(0);
+  const pinch = useRef({ on: false, d0: 0, n0: 0 });
 
-  /* ── Animation loop ─────────────────────────────────────────────── */
   useEffect(() => {
     let run = true;
     const tick = () => {
       if (!run) return;
-      pulse.current = (pulse.current + 0.05) % (Math.PI * 2);
+      pulse.current = (pulse.current + 0.04) % (Math.PI * 2);
       raf.current = requestAnimationFrame(tick);
     };
     tick();
     return () => { run = false; cancelAnimationFrame(raf.current); };
   }, []);
 
-  /* ── Init / update visible range ────────────────────────────────── */
   useEffect(() => {
     if (!candles.length) return;
     setRange(prev => {
@@ -216,56 +169,41 @@ const ChartCanvas: React.FC<ChartProps> = ({ candles, livePrice, trades, activeT
     });
   }, [candles.length]);
 
-  /* ── Wheel: scroll = zoom, shift+scroll = pan ───────────────────── */
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
-    const handler = (e: WheelEvent) => {
+    const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const isZoom = !e.shiftKey; // default scroll = zoom
+      const isZoom = !e.shiftKey;
       setRange(p => {
         const n = p.e - p.s + 1;
         if (isZoom) {
-          // Zoom toward cursor position
           const rect = el.getBoundingClientRect();
-          const mouseX = e.clientX - rect.left;
           const PW = 60;
           const cR = rect.width - PW;
-          const ratio = Math.min(1, Math.max(0, mouseX / cR));
+          const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / cR));
           const delta = e.deltaY > 0 ? 3 : -3;
           const nn = Math.max(12, Math.min(candles.length, n + delta));
           const shrink = n - nn;
           const sOff = Math.round(shrink * ratio);
-          const eOff = shrink - sOff;
           return {
             s: Math.max(0, p.s + sOff),
-            e: Math.min(candles.length - 1, p.e - eOff),
+            e: Math.min(candles.length - 1, p.e - (shrink - sOff)),
           };
         } else {
-          // Pan horizontally
           const d = e.deltaY > 0 ? 4 : -4;
           const ns = Math.max(0, Math.min(candles.length - n, p.s + d));
           return { s: ns, e: ns + n - 1 };
         }
       });
     };
-    el.addEventListener("wheel", handler, { passive: false });
-    return () => el.removeEventListener("wheel", handler);
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
   }, [candles.length]);
 
-  /* ── Mouse handlers — smooth drag + momentum ────────────────────── */
   const onDown = (e: React.MouseEvent) => {
-    const n = range.e - range.s + 1;
-    drag.current = {
-      on: true,
-      x0: e.clientX,
-      offset0: offsetRef.current,
-      vel: 0,
-      lastX: e.clientX,
-      lastT: performance.now(),
-    };
+    drag.current = { on: true, x0: e.clientX, o0: offset.current, vx: 0, lx: e.clientX, lt: performance.now() };
   };
-
   const onMove = (e: React.MouseEvent) => {
     const wrap = wrapRef.current;
     if (!wrap || !candles.length) return;
@@ -279,138 +217,106 @@ const ChartCanvas: React.FC<ChartProps> = ({ candles, livePrice, trades, activeT
       const n = range.e - range.s + 1;
       const slotW = cR / n;
       const dx = e.clientX - drag.current.x0;
-      const newOffset = drag.current.offset0 + dx / slotW;
-
-      // Track velocity for momentum
+      const no = drag.current.o0 + dx / slotW;
       const now = performance.now();
-      const dt = now - drag.current.lastT;
-      if (dt > 0) {
-        drag.current.vel = (e.clientX - drag.current.lastX) / dt;
-      }
-      drag.current.lastX = e.clientX;
-      drag.current.lastT = now;
-
-      // Apply offset as fractional scroll
-      const shift = Math.floor(newOffset);
-      offsetRef.current = newOffset - shift;
+      const dt = now - drag.current.lt;
+      if (dt > 0) drag.current.vx = (e.clientX - drag.current.lx) / dt;
+      drag.current.lx = e.clientX;
+      drag.current.lt = now;
+      const shift = Math.floor(no);
+      offset.current = no - shift;
       const ns = Math.max(0, Math.min(candles.length - n, range.s - shift));
       setRange({ s: ns, e: ns + n - 1 });
-      setMv(null);
+      setHover(null);
       return;
     }
-
-    // Hover
+    const PW = 60;
+    const cR = rect.width - PW;
+    const n = range.e - range.s + 1;
     const idx = Math.floor(mx / (cR / n));
     if (idx >= 0 && idx < n && mx <= cR) {
-      setMv({ x: mx, y: my, i: idx });
+      setHover({ x: mx, y: my, i: idx });
     } else {
-      setMv(null);
+      setHover(null);
     }
   };
-
   const onUp = () => {
     if (!drag.current.on) return;
-    // Apply momentum
-    const vel = drag.current.vel;
+    const v = drag.current.vx;
     drag.current.on = false;
-    if (Math.abs(vel) > 0.3) {
+    if (Math.abs(v) > 0.3) {
       const n = range.e - range.s + 1;
-      const momentum = Math.round(vel * 8);
       setRange(p => {
-        const ns = Math.max(0, Math.min(candles.length - n, p.s - momentum));
+        const ns = Math.max(0, Math.min(candles.length - n, p.s - Math.round(v * 10)));
         return { s: ns, e: ns + n - 1 };
       });
     }
   };
+  const onLeave = () => { drag.current.on = false; setHover(null); };
 
-  const onLeave = () => { drag.current.on = false; setMv(null); };
-
-  /* ── Touch handlers — drag + pinch-to-zoom ──────────────────────── */
   const tStart = (e: React.TouchEvent) => {
     if (e.touches.length === 2) {
-      // Pinch start
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      pinch.current = { active: true, dist0: Math.hypot(dx, dy), count0: range.e - range.s + 1 };
+      const d = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      pinch.current = { on: true, d0: d, n0: range.e - range.s + 1 };
       drag.current.on = false;
       return;
     }
-    drag.current = {
-      on: true,
-      x0: e.touches[0].clientX,
-      offset0: offsetRef.current,
-      vel: 0,
-      lastX: e.touches[0].clientX,
-      lastT: performance.now(),
-    };
+    drag.current = { on: true, x0: e.touches[0].clientX, o0: offset.current, vx: 0, lx: e.touches[0].clientX, lt: performance.now() };
   };
-
   const tMove = (e: React.TouchEvent) => {
     const wrap = wrapRef.current;
     if (!wrap || !candles.length) return;
-    const rect = wrap.getBoundingClientRect();
-
-    // Pinch zoom
-    if (pinch.current.active && e.touches.length === 2) {
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      const dist = Math.hypot(dx, dy);
-      const scale = pinch.current.dist0 / dist;
-      const newN = Math.max(12, Math.min(candles.length, Math.round(pinch.current.count0 * scale)));
+    if (pinch.current.on && e.touches.length === 2) {
+      const d = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const scale = pinch.current.d0 / d;
+      const nn = Math.max(12, Math.min(candles.length, Math.round(pinch.current.n0 * scale)));
       const mid = (range.s + range.e) / 2;
-      const half = newN / 2;
-      const ns = Math.max(0, Math.min(candles.length - newN, Math.round(mid - half)));
-      setRange({ s: ns, e: ns + newN - 1 });
+      const half = nn / 2;
+      setRange({ s: Math.max(0, Math.min(candles.length - nn, Math.round(mid - half))), e: Math.max(0, Math.min(candles.length - 1, Math.round(mid + half))) });
       return;
     }
-
-    // Single finger drag
     if (drag.current.on && e.touches.length === 1) {
-      const t = e.touches[0];
+      const rect = wrap.getBoundingClientRect();
       const PW = 60;
       const cR = rect.width - PW;
       const n = range.e - range.s + 1;
       const slotW = cR / n;
-      const dx = t.clientX - drag.current.x0;
-      const newOffset = drag.current.offset0 + dx / slotW;
-
-      // Track velocity
+      const dx = e.touches[0].clientX - drag.current.x0;
+      const no = drag.current.o0 + dx / slotW;
       const now = performance.now();
-      const dt = now - drag.current.lastT;
-      if (dt > 0) {
-        drag.current.vel = (t.clientX - drag.current.lastX) / dt;
-      }
-      drag.current.lastX = t.clientX;
-      drag.current.lastT = now;
-
-      const shift = Math.floor(newOffset);
-      offsetRef.current = newOffset - shift;
+      const dt = now - drag.current.lt;
+      if (dt > 0) drag.current.vx = (e.touches[0].clientX - drag.current.lx) / dt;
+      drag.current.lx = e.touches[0].clientX;
+      drag.current.lt = now;
+      const shift = Math.floor(no);
+      offset.current = no - shift;
       const ns = Math.max(0, Math.min(candles.length - n, range.s - shift));
       setRange({ s: ns, e: ns + n - 1 });
     }
   };
-
-  const tEnd = (e: React.TouchEvent) => {
-    if (pinch.current.active) {
-      pinch.current.active = false;
-      return;
-    }
+  const tEnd = () => {
+    if (pinch.current.on) { pinch.current.on = false; return; }
     if (!drag.current.on) return;
-    const vel = drag.current.vel;
+    const v = drag.current.vx;
     drag.current.on = false;
-    if (Math.abs(vel) > 0.3) {
+    if (Math.abs(v) > 0.3) {
       const n = range.e - range.s + 1;
-      const momentum = Math.round(vel * 8);
       setRange(p => {
-        const ns = Math.max(0, Math.min(candles.length - n, p.s - momentum));
+        const ns = Math.max(0, Math.min(candles.length - n, p.s - Math.round(v * 10)));
         return { s: ns, e: ns + n - 1 };
       });
     }
   };
 
-  /* ═══════════════════════════════════════════════════════════════════════
-     RENDER
-     ═══════════════════════════════════════════════════════════════════════ */
+  /* ═════════════════════════════════════════════════════════════════════════
+     DRAW
+     ═════════════════════════════════════════════════════════════════════════ */
   const draw = useCallback(() => {
     const cvs = cvsRef.current;
     const wrap = wrapRef.current;
@@ -418,51 +324,42 @@ const ChartCanvas: React.FC<ChartProps> = ({ candles, livePrice, trades, activeT
     const ctx = cvs.getContext("2d");
     if (!ctx) return;
 
-    /* ── Canvas sizing ────────────────────────────────────────────── */
-    const W = wrap.clientWidth || 800;
-    const H = wrap.clientHeight || 500;
+    const W = wrap.clientWidth;
+    const H = wrap.clientHeight;
     const dpr = window.devicePixelRatio || 1;
     cvs.width = W * dpr;
     cvs.height = H * dpr;
     ctx.scale(dpr, dpr);
 
-    /* ── Layout constants ─────────────────────────────────────────── */
-    const AXIS_W = 60;
-    const TIME_H = 22;
-    const cL = 0;
-    const cR = W - AXIS_W;
-    const cW = cR - cL;
-    const cT = 0;
-    const cB = H - TIME_H;
-    const cH = cB - cT;
+    const AXIS_W = 64;
+    const TIME_H = 24;
+    const XL = 0;
+    const XR = W - AXIS_W;
+    const CW = XR - XL;
+    const YT = 0;
+    const YB = H - TIME_H;
+    const CH = YB - YT;
 
-    /* ── Background ───────────────────────────────────────────────── */
-    const bg = ctx.createLinearGradient(0, 0, 0, H);
-    bg.addColorStop(0, T.bgTop);
-    bg.addColorStop(0.45, T.bg);
-    bg.addColorStop(1, T.bgBot);
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, W, H);
-
-    // Very subtle center radial glow
-    const rg = ctx.createRadialGradient(cW * 0.5, cH * 0.4, 0, cW * 0.5, cH * 0.4, cW * 0.55);
-    rg.addColorStop(0, "rgba(0,255,136,0.008)");
-    rg.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = rg;
+    /* ── Background ─────────────────────────────────────────────── */
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, C.bgTop);
+    grad.addColorStop(0.5, C.bg);
+    grad.addColorStop(1, C.bgBot);
+    ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
 
     if (candles.length < 2) return;
 
-    /* ── Heikin Ashi + visible window ─────────────────────────────── */
+    /* ── Heikin Ashi ────────────────────────────────────────────── */
     const ha = heikinAshi(candles);
-    const vS = Math.max(0, range.s);
-    const vE = Math.min(candles.length - 1, range.e);
-    const vHA = ha.slice(vS, vE + 1);
-    const vC = candles.slice(vS, vE + 1);
+    const viS = Math.max(0, range.s);
+    const viE = Math.min(candles.length - 1, range.e);
+    const vHA = ha.slice(viS, viE + 1);
+    const vC = candles.slice(viS, viE + 1);
     if (!vHA.length) return;
     const vN = vHA.length;
 
-    /* ── Price range ──────────────────────────────────────────────── */
+    /* ── Price range ────────────────────────────────────────────── */
     let hi = -Infinity, lo = Infinity;
     for (const c of vHA) { if (c.h > hi) hi = c.h; if (c.l < lo) lo = c.l; }
     if (livePrice > hi) hi = livePrice;
@@ -471,60 +368,71 @@ const ChartCanvas: React.FC<ChartProps> = ({ candles, livePrice, trades, activeT
       if (t.entryPrice > hi) hi = t.entryPrice;
       if (t.entryPrice < lo) lo = t.entryPrice;
     }
-    const pad = (hi - lo || 1) * 0.1;
+    const pad = (hi - lo || 1) * 0.12;
     hi += pad; lo -= pad;
-    const pR = hi - lo;
+    const PR = hi - lo;
 
-    /* ── Scaling ──────────────────────────────────────────────────── */
-    const slot = cW / vN;
-    const bW = Math.max(3, Math.min(14, Math.floor(slot * 0.58)));
-    const xAt = (i: number) => cL + (i + 0.5) * slot;
-    const yAt = (p: number) => cT + ((hi - p) / pR) * cH;
+    /* ── Scales ─────────────────────────────────────────────────── */
+    const slot = CW / vN;
+    const bw = Math.max(3, Math.min(14, Math.floor(slot * 0.55)));
+    const xAt = (i: number) => XL + (i + 0.5) * slot;
+    const yAt = (p: number) => YT + ((hi - p) / PR) * CH;
 
-    /* ════════════════════════════════════════════════════════════════
-       GRID LINES
-       ════════════════════════════════════════════════════════════════ */
-    const step = gridStep(pR, 6);
-    const g0 = Math.ceil(lo / step) * step;
-
-    // Horizontal grid (price)
+    /* ═══════════════════════════════════════════════════════════════
+       GRID
+       ═══════════════════════════════════════════════════════════════ */
     ctx.font = '9px "SF Mono",ui-monospace,Menlo,Consolas,monospace';
     ctx.textBaseline = "middle";
-    for (let v = g0; v <= hi; v += step) {
+
+    const step = gridStep(PR, 6);
+    const gS = Math.ceil(lo / step) * step;
+
+    // Major horizontal
+    for (let v = gS; v <= hi; v += step) {
       const y = snap(yAt(v));
-      if (y < cT || y > cB) continue;
-      ctx.strokeStyle = T.gridH;
+      if (y < YT || y > YB) continue;
+      ctx.strokeStyle = C.gridMajor;
       ctx.lineWidth = 1;
       ctx.setLineDash([]);
-      ctx.beginPath(); ctx.moveTo(cL, y); ctx.lineTo(cR, y); ctx.stroke();
-      ctx.fillStyle = T.txtDim;
+      ctx.beginPath(); ctx.moveTo(XL, y); ctx.lineTo(XR, y); ctx.stroke();
+      ctx.fillStyle = C.axisLabel;
       ctx.textAlign = "left";
-      ctx.fillText(fmt.axis(v), cR + 6, y);
+      ctx.fillText(fmt.axis(v), XR + 6, y);
     }
 
-    // Vertical grid (time)
+    // Minor horizontal (half-step)
+    const halfStep = step / 2;
+    for (let v = gS + halfStep; v <= hi; v += halfStep) {
+      const y = snap(yAt(v));
+      if (y < YT || y > YB) continue;
+      ctx.strokeStyle = C.gridMinor;
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(XL, y); ctx.lineTo(XR, y); ctx.stroke();
+    }
+
+    // Vertical
     const tStep = Math.max(1, Math.floor(vN / 6));
     for (let i = 0; i < vN; i += tStep) {
       const x = snap(xAt(i));
-      if (x < cL || x > cR) continue;
-      ctx.strokeStyle = T.gridV;
+      if (x < XL || x > XR) continue;
+      ctx.strokeStyle = C.gridMajor;
       ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(x, cT); ctx.lineTo(x, cB); ctx.stroke();
-      ctx.fillStyle = T.txtDim;
+      ctx.beginPath(); ctx.moveTo(x, YT); ctx.lineTo(x, YB); ctx.stroke();
+      ctx.fillStyle = C.axisLabel;
       ctx.textAlign = "center";
-      ctx.fillText(fmt.time(vC[i].time), xAt(i), H - TIME_H + 13);
+      ctx.fillText(fmt.time(vC[i].time), xAt(i), H - TIME_H + 14);
     }
 
-    // Axis separator lines
-    ctx.strokeStyle = T.gridAxis;
+    // Axis lines
+    ctx.strokeStyle = C.axisLine;
     ctx.lineWidth = 1;
     ctx.setLineDash([]);
-    ctx.beginPath(); ctx.moveTo(cL, snap(cB)); ctx.lineTo(cR, snap(cB)); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(snap(cR), cT); ctx.lineTo(snap(cR), cB); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(XL, snap(YB)); ctx.lineTo(XR, snap(YB)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(snap(XR), YT + 1); ctx.lineTo(snap(XR), YB); ctx.stroke();
 
-    /* ════════════════════════════════════════════════════════════════
-       HEIKIN ASHI CANDLES
-       ════════════════════════════════════════════════════════════════ */
+    /* ═══════════════════════════════════════════════════════════════
+       CANDLES
+       ═══════════════════════════════════════════════════════════════ */
     for (let i = 0; i < vN; i++) {
       const c = vHA[i];
       const x = xAt(i);
@@ -534,364 +442,330 @@ const ChartCanvas: React.FC<ChartProps> = ({ candles, livePrice, trades, activeT
       const bTop = Math.min(yO, yC);
       const bBot = Math.max(yO, yC);
       const bH = Math.max(1, bBot - bTop);
-      const l = Math.floor(x - bW / 2);
+      const l = Math.floor(x - bw / 2);
 
-      // Candle glow aura
-      if (bW > 5) {
-        const gs = bW + 10;
+      // Glow aura
+      if (bw > 5) {
+        const gs = bw + 10;
         const gg = ctx.createRadialGradient(x, (bTop + bBot) / 2, 0, x, (bTop + bBot) / 2, gs);
-        gg.addColorStop(0, up ? T.bullGlow : T.bearGlow);
+        gg.addColorStop(0, up ? C.bullGlow : C.bearGlow);
         gg.addColorStop(1, "rgba(0,0,0,0)");
         ctx.fillStyle = gg;
         ctx.fillRect(x - gs, bTop - gs / 2, gs * 2, bH + gs);
       }
 
       // Wick
-      ctx.strokeStyle = up ? T.bullWick : T.bearWick;
-      ctx.lineWidth = Math.max(1, bW * 0.12);
-      ctx.beginPath();
-      ctx.moveTo(snap(x), Math.round(yH));
-      ctx.lineTo(snap(x), Math.round(yL));
-      ctx.stroke();
+      ctx.strokeStyle = up ? C.bullWick : C.bearWick;
+      ctx.lineWidth = Math.max(1.2, bw * 0.14);
+      ctx.globalAlpha = 0.75;
+      ctx.beginPath(); ctx.moveTo(snap(x), Math.round(yH)); ctx.lineTo(snap(x), Math.round(yL)); ctx.stroke();
+      ctx.globalAlpha = 1;
 
-      // Body gradient
-      const bg2 = ctx.createLinearGradient(0, bTop, 0, bTop + bH);
+      // Body
+      const bodyGrad = ctx.createLinearGradient(0, bTop, 0, bBot);
       if (up) {
-        bg2.addColorStop(0, T.bull);
-        bg2.addColorStop(1, T.bullBody);
+        bodyGrad.addColorStop(0, "#00ff88");
+        bodyGrad.addColorStop(1, "#00c853");
       } else {
-        bg2.addColorStop(0, T.bearBody);
-        bg2.addColorStop(1, T.bear);
+        bodyGrad.addColorStop(0, "#d32f2f");
+        bodyGrad.addColorStop(1, "#ef5350");
       }
-      ctx.fillStyle = bg2;
-      ctx.fillRect(l, Math.floor(bTop), bW, Math.max(1, Math.floor(bH)));
+      ctx.fillStyle = bodyGrad;
+      ctx.fillRect(l, Math.floor(bTop), bw, Math.max(1, Math.floor(bH)));
 
-      // Subtle body border
-      if (bW > 4) {
-        ctx.strokeStyle = up ? "rgba(0,255,136,0.18)" : "rgba(230,57,70,0.18)";
+      // Border
+      if (bw > 4) {
+        ctx.strokeStyle = up ? "rgba(0,255,136,0.2)" : "rgba(239,83,80,0.2)";
         ctx.lineWidth = 0.5;
-        ctx.strokeRect(l, Math.floor(bTop), bW, Math.max(1, Math.floor(bH)));
+        ctx.strokeRect(l, Math.floor(bTop), bw, Math.max(1, Math.floor(bH)));
       }
     }
 
-    /* ════════════════════════════════════════════════════════════════
-       LIVE PRICE — DOTTED LINE + PULSE + TAG
-       ════════════════════════════════════════════════════════════════ */
+    /* ═══════════════════════════════════════════════════════════════
+       LIVE PRICE LINE
+       ═══════════════════════════════════════════════════════════════ */
     const lpY = yAt(livePrice);
     const lpUp = livePrice >= (vHA[vHA.length - 1]?.o ?? livePrice);
-    const lpCol = lpUp ? T.liveUp : T.liveDown;
-    const pa = 0.1 + Math.sin(pulse.current) * 0.05;
+    const lpCol = lpUp ? C.liveGreen : C.liveRed;
+    const pulseA = 0.08 + Math.sin(pulse.current) * 0.05;
 
-    // Glow band
-    const bandH = 30;
-    const band = ctx.createLinearGradient(0, lpY - bandH, 0, lpY + bandH);
-    const gb = lpUp ? "0,255,136" : "230,57,70";
-    band.addColorStop(0, `rgba(${gb},0)`);
-    band.addColorStop(0.5, `rgba(${gb},${pa})`);
-    band.addColorStop(1, `rgba(${gb},0)`);
-    ctx.fillStyle = band;
-    ctx.fillRect(cL, lpY - bandH, cW, bandH * 2);
+    // Pulsing glow band
+    const bandGrad = ctx.createLinearGradient(0, lpY - 28, 0, lpY + 28);
+    const gb = lpUp ? "0,255,136" : "239,83,80";
+    bandGrad.addColorStop(0, `rgba(${gb},0)`);
+    bandGrad.addColorStop(0.5, `rgba(${gb},${pulseA})`);
+    bandGrad.addColorStop(1, `rgba(${gb},0)`);
+    ctx.fillStyle = bandGrad;
+    ctx.fillRect(XL, lpY - 28, CW, 56);
 
     // Dotted line
     ctx.setLineDash([3, 3]);
     ctx.strokeStyle = lpCol;
     ctx.lineWidth = 1;
-    ctx.globalAlpha = 0.6;
-    ctx.beginPath(); ctx.moveTo(cL, snap(lpY)); ctx.lineTo(cR, snap(lpY)); ctx.stroke();
+    ctx.globalAlpha = 0.55;
+    ctx.beginPath(); ctx.moveTo(XL, snap(lpY)); ctx.lineTo(XR, snap(lpY)); ctx.stroke();
     ctx.setLineDash([]);
     ctx.globalAlpha = 1;
 
     // Price tag — right axis
-    const pTag = fmt.price(livePrice);
+    const tag = fmt.price(livePrice);
     ctx.font = 'bold 9px "SF Mono",ui-monospace,Menlo,monospace';
-    const pTW = Math.round(ctx.measureText(pTag).width) + 12;
-    const pTH = 18;
-    const pTX = cR + 1;
-    const pTY = Math.round(lpY - pTH / 2);
+    const tW = Math.round(ctx.measureText(tag).width) + 12;
+    const tH = 18;
+    const tX = XR + 1;
+    const tY = Math.round(lpY - tH / 2);
 
     ctx.fillStyle = lpCol;
-    rrect(ctx, pTX, pTY, pTW, pTH, 3);
+    roundRect(ctx, tX, tY, tW, tH, 3);
     ctx.fill();
-
-    // Arrow triangle
     ctx.beginPath();
-    ctx.moveTo(pTX, lpY);
-    ctx.lineTo(pTX - 4, lpY - 3.5);
-    ctx.lineTo(pTX - 4, lpY + 3.5);
+    ctx.moveTo(tX, lpY);
+    ctx.lineTo(tX - 4, lpY - 3.5);
+    ctx.lineTo(tX - 4, lpY + 3.5);
     ctx.closePath();
     ctx.fill();
 
     ctx.fillStyle = "#fff";
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillText(pTag, pTX + 6, lpY);
+    ctx.fillText(tag, tX + 6, lpY);
 
-    /* ════════════════════════════════════════════════════════════════
-       ENTRY TRADE LINES — DOTTED GREEN + YELLOW TAG
-       ════════════════════════════════════════════════════════════════ */
+    /* ═══════════════════════════════════════════════════════════════
+       ENTRY LINES — dotted green + yellow ₹ tag
+       ═══════════════════════════════════════════════════════════════ */
     for (const tr of trades) {
       const ey = yAt(tr.entryPrice);
-      if (ey < cT || ey > cB) continue;
+      if (ey < YT || ey > YB) continue;
 
-      // Dotted green line
-      ctx.setLineDash([6, 4]);
-      ctx.strokeStyle = T.entryLine;
+      ctx.setLineDash([5, 4]);
+      ctx.strokeStyle = C.entryLine;
       ctx.lineWidth = 1.2;
-      ctx.globalAlpha = 0.65;
-      ctx.beginPath(); ctx.moveTo(cL, snap(ey)); ctx.lineTo(cR, snap(ey)); ctx.stroke();
+      ctx.globalAlpha = 0.6;
+      ctx.beginPath(); ctx.moveTo(XL, snap(ey)); ctx.lineTo(XR, snap(ey)); ctx.stroke();
       ctx.setLineDash([]);
       ctx.globalAlpha = 1;
 
-      // Yellow tag
+      // Yellow tag with amount
       const txt = `${tr.amount} \u20b9`;
-      ctx.font = 'bold 10px "SF Mono",ui-monospace,Menlo,monospace';
-      const tW = Math.round(ctx.measureText(txt).width);
-      const padX = 7;
-      const tagH = 17;
-      const tagFull = tW + padX * 2 + 12;
-      const tagX = cL + 5;
+      ctx.font = 'bold 9px "SF Mono",ui-monospace,Menlo,monospace';
+      const txtW = Math.round(ctx.measureText(txt).width);
+      const pad = 6;
+      const tagH = 16;
+      const full = txtW + pad * 2 + 10;
+      const tagX = XL + 4;
       const tagY = Math.round(ey) - tagH / 2;
 
-      // Tag body
-      ctx.fillStyle = T.entryTag;
+      ctx.fillStyle = C.entryTag;
       ctx.beginPath();
       ctx.moveTo(tagX + 3, tagY);
-      ctx.lineTo(tagX + tagFull - 3, tagY);
-      ctx.arcTo(tagX + tagFull, tagY, tagX + tagFull, tagY + 3, 3);
-      ctx.lineTo(tagX + tagFull, tagY + tagH - 3);
-      ctx.arcTo(tagX + tagFull, tagY + tagH, tagX + tagFull - 3, tagY + tagH, 3);
-      ctx.lineTo(tagX + tagFull - 6, tagY + tagH);
-      // Arrow notch
-      ctx.lineTo(tagX + tagFull, tagY + tagH / 2);
-      ctx.lineTo(tagX + tagFull - 6, tagY);
+      ctx.lineTo(tagX + full - 3, tagY);
+      ctx.arcTo(tagX + full, tagY, tagX + full, tagY + 3, 3);
+      ctx.lineTo(tagX + full, tagY + tagH - 3);
+      ctx.arcTo(tagX + full, tagY + tagH, tagX + full - 3, tagY + tagH, 3);
+      ctx.lineTo(tagX + full - 5, tagY + tagH);
+      ctx.lineTo(tagX + full, tagY + tagH / 2);
+      ctx.lineTo(tagX + full - 5, tagY);
       ctx.lineTo(tagX + 3, tagY);
       ctx.arcTo(tagX, tagY, tagX, tagY + 3, 3);
       ctx.closePath();
       ctx.fill();
 
-      // Text
       ctx.fillStyle = "#111119";
-      ctx.font = 'bold 10px "SF Mono",ui-monospace,Menlo,monospace';
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
-      ctx.fillText(txt, tagX + padX + 4, ey);
+      ctx.fillText(txt, tagX + pad + 4, ey);
     }
 
-    /* ════════════════════════════════════════════════════════════════
-       TIMER — DOTTED VERTICAL RED LINE + COUNTDOWN CIRCLE
-       ════════════════════════════════════════════════════════════════ */
+    /* ═══════════════════════════════════════════════════════════════
+       TIMER — dotted red vertical + countdown circle
+       ═══════════════════════════════════════════════════════════════ */
     if (activeTrade && activeTrade.timeLeft > 0) {
       const prog = 1 - activeTrade.timeLeft / activeTrade.duration;
-      const tx = cR * 0.6;
+      const tx = XR * 0.6;
 
-      // Dotted vertical red
-      ctx.setLineDash([5, 4]);
-      ctx.strokeStyle = T.timerLine;
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = C.timerLine;
       ctx.lineWidth = 1.2;
-      ctx.globalAlpha = 0.75;
-      ctx.beginPath(); ctx.moveTo(snap(tx), cT); ctx.lineTo(snap(tx), cB); ctx.stroke();
+      ctx.globalAlpha = 0.7;
+      ctx.beginPath(); ctx.moveTo(snap(tx), YT); ctx.lineTo(snap(tx), YB); ctx.stroke();
       ctx.setLineDash([]);
       ctx.globalAlpha = 1;
 
-      // Countdown circle
-      const cr = 17;
-      const cy = cT + 32;
+      // Circle
+      const cr = 16;
+      const cy = YT + 30;
 
-      // Glow
-      const cg = ctx.createRadialGradient(tx, cy, cr - 2, tx, cy, cr + 12);
-      cg.addColorStop(0, "rgba(230,57,70,0.18)");
+      const cg = ctx.createRadialGradient(tx, cy, cr - 2, tx, cy, cr + 10);
+      cg.addColorStop(0, "rgba(229,57,53,0.2)");
       cg.addColorStop(1, "rgba(0,0,0,0)");
       ctx.fillStyle = cg;
-      ctx.fillRect(tx - cr - 12, cy - cr - 12, (cr + 12) * 2, (cr + 12) * 2);
+      ctx.fillRect(tx - cr - 10, cy - cr - 10, (cr + 10) * 2, (cr + 10) * 2);
 
-      // Dark fill
-      ctx.beginPath();
-      ctx.arc(tx, cy, cr, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(14,14,22,0.95)";
+      ctx.beginPath(); ctx.arc(tx, cy, cr, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(14,16,24,0.95)";
       ctx.fill();
-      ctx.strokeStyle = "rgba(255,255,255,0.08)";
+      ctx.strokeStyle = "rgba(255,255,255,0.06)";
       ctx.lineWidth = 1.5;
       ctx.stroke();
 
-      // Track ring
-      ctx.beginPath();
-      ctx.arc(tx, cy, cr - 2, 0, Math.PI * 2);
+      ctx.beginPath(); ctx.arc(tx, cy, cr - 2, 0, Math.PI * 2);
       ctx.strokeStyle = "rgba(255,255,255,0.04)";
       ctx.lineWidth = 3;
       ctx.stroke();
 
-      // Progress arc
       ctx.beginPath();
       ctx.arc(tx, cy, cr - 2, -Math.PI / 2, -Math.PI / 2 + prog * Math.PI * 2);
-      ctx.strokeStyle = T.timerLine;
+      ctx.strokeStyle = C.timerLine;
       ctx.lineWidth = 3;
       ctx.lineCap = "round";
       ctx.stroke();
       ctx.lineCap = "butt";
 
-      // Text
       ctx.fillStyle = "#fff";
-      ctx.font = 'bold 11px "SF Mono",ui-monospace,Menlo,monospace';
+      ctx.font = 'bold 10px "SF Mono",ui-monospace,Menlo,monospace';
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(fmt.countdown(activeTrade.timeLeft), tx, cy);
     }
 
-    /* ════════════════════════════════════════════════════════════════
-       EXPIRY — SOLID VERTICAL RED LINE
-       ════════════════════════════════════════════════════════════════ */
+    /* ═══════════════════════════════════════════════════════════════
+       EXPIRY — solid red vertical line
+       ═══════════════════════════════════════════════════════════════ */
     if (activeTrade && activeTrade.timeLeft > 0) {
-      const ex = cR * 0.82;
-
-      ctx.strokeStyle = T.expireLine;
+      const ex = XR * 0.82;
+      ctx.strokeStyle = C.expireLine;
       ctx.lineWidth = 1.5;
-      ctx.globalAlpha = 0.7;
-      ctx.beginPath(); ctx.moveTo(snap(ex), cT); ctx.lineTo(snap(ex), cB); ctx.stroke();
+      ctx.globalAlpha = 0.65;
+      ctx.beginPath(); ctx.moveTo(snap(ex), YT); ctx.lineTo(snap(ex), YB); ctx.stroke();
       ctx.globalAlpha = 1;
 
-      // Label
-      ctx.fillStyle = T.expireLine;
-      ctx.font = '8px "SF Mono",ui-monospace,Menlo,monospace';
+      ctx.fillStyle = C.expireLine;
+      ctx.font = '7px "SF Mono",ui-monospace,Menlo,monospace';
       ctx.textAlign = "center";
       ctx.textBaseline = "bottom";
-      ctx.globalAlpha = 0.75;
-      ctx.fillText("EXPIRY", ex, cT + 12);
+      ctx.globalAlpha = 0.7;
+      ctx.fillText("EXPIRY", ex, YT + 12);
       ctx.globalAlpha = 1;
     }
 
-    /* ════════════════════════════════════════════════════════════════
-       CROSSHAIR + TOOLTIP
-       ════════════════════════════════════════════════════════════════ */
-    if (mv && mv.i >= 0 && mv.i < vN) {
-      const cx = xAt(mv.i);
-      const cy = mv.y;
+    /* ═══════════════════════════════════════════════════════════════
+       CROSSHAIR
+       ═══════════════════════════════════════════════════════════════ */
+    if (hover && hover.i >= 0 && hover.i < vN) {
+      const cx = xAt(hover.i);
+      const cy = hover.y;
 
-      // Vertical line
-      ctx.setLineDash([3, 3]);
-      ctx.strokeStyle = T.cross;
+      ctx.setLineDash([2, 3]);
+      ctx.strokeStyle = C.crosshair;
       ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(snap(cx), cT); ctx.lineTo(snap(cx), cB); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(snap(cx), YT); ctx.lineTo(snap(cx), YB); ctx.stroke();
+      if (cy >= YT && cy <= YB) {
+        ctx.beginPath(); ctx.moveTo(XL, snap(cy)); ctx.lineTo(XR, snap(cy)); ctx.stroke();
 
-      // Horizontal line
-      if (cy >= cT && cy <= cB) {
-        ctx.beginPath(); ctx.moveTo(cL, snap(cy)); ctx.lineTo(cR, snap(cy)); ctx.stroke();
-
-        // Price label on axis
-        const cp = hi - ((cy - cT) / cH) * pR;
-        const cpL = fmt.price(cp);
+        const cp = hi - ((cy - YT) / CH) * PR;
+        const cpl = fmt.price(cp);
         ctx.setLineDash([]);
         ctx.font = '9px "SF Mono",ui-monospace,Menlo,monospace';
-        const cw = Math.round(ctx.measureText(cpL).width) + 10;
-        ctx.fillStyle = "rgba(20,22,35,0.95)";
-        rrect(ctx, cR + 1, Math.round(cy) - 9, cw, 18, 2);
+        const cw = Math.round(ctx.measureText(cpl).width) + 10;
+        roundRect(ctx, XR + 1, Math.round(cy) - 8, cw, 16, 2);
+        ctx.fillStyle = C.crossLabel;
         ctx.fill();
-        ctx.strokeStyle = "rgba(255,255,255,0.08)";
-        ctx.lineWidth = 1;
-        ctx.stroke();
         ctx.fillStyle = "#fff";
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
-        ctx.fillText(cpL, cR + 6, cy);
+        ctx.fillText(cpl, XR + 6, cy);
       }
       ctx.setLineDash([]);
 
-      // Time label at bottom
-      const tl = fmt.time(vC[mv.i].time);
-      const dl = fmt.date(vC[mv.i].time);
-      const tlW = 72;
-      ctx.fillStyle = "rgba(20,22,35,0.95)";
-      rrect(ctx, cx - tlW / 2, H - TIME_H, tlW, TIME_H, 2);
+      // Time label
+      const tl = fmt.time(vC[hover.i].time);
+      const dl = fmt.date(vC[hover.i].time);
+      const tlW = 68;
+      roundRect(ctx, cx - tlW / 2, H - TIME_H, tlW, TIME_H, 2);
+      ctx.fillStyle = C.crossLabel;
       ctx.fill();
-      ctx.strokeStyle = "rgba(255,255,255,0.08)";
-      ctx.lineWidth = 1;
-      ctx.stroke();
       ctx.fillStyle = "#fff";
       ctx.font = '9px "SF Mono",ui-monospace,Menlo,monospace';
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(`${dl} ${tl}`, cx, H - TIME_H + 11);
+      ctx.fillText(`${dl} ${tl}`, cx, H - TIME_H + 12);
 
-      // Highlight candle outline
-      const hc = vHA[mv.i];
+      // Candle highlight
+      const hc = vHA[hover.i];
       const hcUp = hc.c >= hc.o;
-      ctx.strokeStyle = hcUp ? T.bull : T.bear;
+      ctx.strokeStyle = hcUp ? C.bullWick : C.bearWick;
       ctx.lineWidth = 1.5;
-      ctx.globalAlpha = 0.45;
-      const hcBT = Math.min(yAt(hc.o), yAt(hc.c));
-      const hcBB = Math.max(yAt(hc.o), yAt(hc.c));
-      ctx.strokeRect(Math.floor(cx - bW / 2) - 1, Math.floor(hcBT) - 1, bW + 2, Math.max(1, Math.floor(hcBB - hcBT)) + 2);
+      ctx.globalAlpha = 0.35;
+      const bhT = Math.min(yAt(hc.o), yAt(hc.c));
+      const bhB = Math.max(yAt(hc.o), yAt(hc.c));
+      ctx.strokeRect(Math.floor(cx - bw / 2) - 1, Math.floor(bhT) - 1, bw + 2, Math.max(1, Math.floor(bhB - bhT)) + 2);
       ctx.globalAlpha = 1;
 
-      /* ── OHLC Tooltip ─────────────────────────────────────────── */
+      /* ── OHLC Tooltip ────────────────────────────────────────── */
       const isUp = hc.c >= hc.o;
       const chg = ((hc.c - hc.o) / hc.o) * 100;
-      const tipW = 152, tipH = 106;
-      let tipX = mv.x + 14;
-      let tipY = cT + 10;
-      if (tipX + tipW > cR - 8) tipX = mv.x - tipW - 14;
-      if (tipY + tipH > cB - 8) tipY = cB - tipH - 8;
+      const tipW = 148, tipH = 100;
+      let tipX = hover.x + 14;
+      let tipY = YT + 10;
+      if (tipX + tipW > XR - 8) tipX = hover.x - tipW - 14;
+      if (tipY + tipH > YB - 8) tipY = YB - tipH - 8;
 
-      ctx.fillStyle = T.tipBg;
-      ctx.strokeStyle = T.tipBorder;
+      ctx.fillStyle = C.tipBg;
+      ctx.strokeStyle = C.tipBorder;
       ctx.lineWidth = 1;
-      rrect(ctx, tipX, tipY, tipW, tipH, 5);
+      roundRect(ctx, tipX, tipY, tipW, tipH, 5);
       ctx.fill();
       ctx.stroke();
 
-      // Accent bar
-      ctx.fillStyle = isUp ? T.bull : T.bear;
+      ctx.fillStyle = isUp ? C.bullWick : C.bearWick;
       ctx.fillRect(tipX + 1, tipY + 1, tipW - 2, 2);
 
-      let ty = tipY + 9;
+      let ly = tipY + 9;
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
 
-      // Date + time
       ctx.font = '9px "SF Mono",ui-monospace,Menlo,monospace';
-      ctx.fillStyle = T.txtDim;
-      ctx.fillText(`${fmt.date(vC[mv.i].time)} ${fmt.time(vC[mv.i].time)}`, tipX + 10, ty);
-      ty += 13;
+      ctx.fillStyle = C.axisLabel;
+      ctx.fillText(`${fmt.date(vC[hover.i].time)} ${fmt.time(vC[hover.i].time)}`, tipX + 10, ly);
+      ly += 13;
 
-      // Label + change
-      ctx.fillStyle = isUp ? T.bull : T.bear;
+      ctx.fillStyle = isUp ? C.bullWick : C.bearWick;
       ctx.font = 'bold 10px "SF Mono",ui-monospace,Menlo,monospace';
-      ctx.fillText(`Heikin Ashi  ${chg >= 0 ? "+" : ""}${chg.toFixed(2)}%`, tipX + 10, ty);
-      ty += 16;
+      ctx.fillText(`HA  ${chg >= 0 ? "+" : ""}${chg.toFixed(2)}%`, tipX + 10, ly);
+      ly += 15;
 
-      // OHLC
-      const items: [string, number, string][] = [
-        ["O", hc.o, T.txtBright],
-        ["H", hc.h, T.bull],
-        ["L", hc.l, T.bear],
-        ["C", hc.c, isUp ? T.bull : T.bear],
+      const ohlc: [string, number, string][] = [
+        ["O", hc.o, C.axisLabel],
+        ["H", hc.h, C.bullWick],
+        ["L", hc.l, C.bearWick],
+        ["C", hc.c, isUp ? C.bullWick : C.bearWick],
       ];
-      for (const [lbl, val, col] of items) {
+      for (const [lb, val, col] of ohlc) {
         ctx.font = '9px "SF Mono",ui-monospace,Menlo,monospace';
-        ctx.fillStyle = T.txtDim;
-        ctx.fillText(lbl, tipX + 10, ty);
+        ctx.fillStyle = C.axisLabel;
+        ctx.fillText(lb, tipX + 10, ly);
         ctx.fillStyle = col;
         ctx.font = 'bold 10px "SF Mono",ui-monospace,Menlo,monospace';
-        ctx.fillText(fmt.price(val), tipX + 22, ty);
-        ty += 13;
+        ctx.fillText(fmt.price(val), tipX + 22, ly);
+        ly += 13;
       }
     }
 
-    /* ── Scroll indicator ────────────────────────────────────────── */
+    /* ── Scrollbar ─────────────────────────────────────────────── */
     if (candles.length > vN) {
-      const sbW = cW * 0.3;
+      const sbW = CW * 0.3;
       const sbH = 2;
-      const sbX = cW / 2 - sbW / 2;
+      const sbX = CW / 2 - sbW / 2;
       const sbY = H - 3;
-      const tw2 = (vN / candles.length) * sbW;
-      const tx2 = sbX + (vS / candles.length) * sbW;
+      const tw = (vN / candles.length) * sbW;
+      const tx = sbX + (viS / candles.length) * sbW;
       ctx.fillStyle = "rgba(255,255,255,0.03)";
       ctx.fillRect(sbX, sbY, sbW, sbH);
       ctx.fillStyle = "rgba(255,255,255,0.12)";
-      ctx.fillRect(tx2, sbY, tw2, sbH);
+      ctx.fillRect(tx, sbY, tw, sbH);
     }
-  }, [candles, livePrice, trades, activeTrade, mv, range]);
+  }, [candles, livePrice, trades, activeTrade, hover, range]);
 
-  /* ── Effects ────────────────────────────────────────────────────── */
   useEffect(() => { draw(); }, [draw]);
   useEffect(() => {
     const el = wrapRef.current;
@@ -916,7 +790,7 @@ const ChartCanvas: React.FC<ChartProps> = ({ candles, livePrice, trades, activeT
       onTouchStart={tStart}
       onTouchMove={tMove}
       onTouchEnd={tEnd}
-      style={{ cursor: drag.current.on ? "grabbing" : mv ? "crosshair" : "default" }}
+      style={{ cursor: drag.current.on ? "grabbing" : hover ? "crosshair" : "default" }}
     >
       <canvas ref={cvsRef} className="absolute inset-0" />
     </div>
