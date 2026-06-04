@@ -41,6 +41,7 @@ function AppShell() {
     addTransactionDb,
     depositReal,
     withdrawReal,
+    withdrawFake,
     loadTransactions,
     refreshDashboard,
   } = useAuth();
@@ -109,7 +110,12 @@ function AppShell() {
   };
 
   const handleWithdraw = async (amount: number) => {
-    const res = await withdrawReal(amount);
+    let res;
+    if (accountMode === 'demo') {
+      res = withdrawFake(amount);
+    } else {
+      res = await withdrawReal(amount);
+    }
     if (res.success) {
       addTransaction({
         id: `TX-${Math.random().toString(36).toUpperCase().slice(2, 8)}`,
@@ -122,7 +128,7 @@ function AppShell() {
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
         date: 'Today',
         status: 'completed',
-        account: 'real',
+        account: accountMode,
       });
     }
     return res;
@@ -228,30 +234,30 @@ function AppShell() {
 
       <div className="flex-1 flex flex-col relative h-full w-full overflow-hidden">
         {activeTab !== 'send' && (
-          <header className="h-16 flex-shrink-0 px-6 bg-[#0d0e14] border-b border-white/5 flex items-center justify-between z-30">
-            <h1 className="text-sm font-black text-white uppercase tracking-[0.2em]">{TAB_TITLES[activeTab]}</h1>
-            <button type="button" className="w-10 h-10 rounded-2xl bg-[#161821] border border-white/10 flex items-center justify-center">
-              <User className="w-5 h-5 text-gray-400" />
+          <header className="h-12 flex-shrink-0 px-4 bg-[#0d0e14] border-b border-white/5 flex items-center justify-between z-30 sm:h-16 sm:px-6">
+            <h1 className="text-xs font-black text-white uppercase tracking-[0.2em] sm:text-sm">{TAB_TITLES[activeTab]}</h1>
+            <button type="button" className="w-8 h-8 rounded-xl bg-[#161821] border border-white/10 flex items-center justify-center sm:w-10 sm:h-10 sm:rounded-2xl">
+              <User className="w-4 h-4 text-gray-400 sm:w-5 sm:h-5" />
             </button>
           </header>
         )}
 
-        <main className={`flex-1 relative overflow-y-auto scrollbar-hide transition-all ${isTransitioning ? 'opacity-0 scale-98' : 'opacity-100'} ${activeTab === 'send' ? 'pb-[72px] overflow-hidden' : 'pb-[90px]'}`}>
+        <main className={`flex-1 relative overflow-y-auto scrollbar-hide transition-all ${isTransitioning ? 'opacity-0 scale-98' : 'opacity-100'} ${activeTab === 'send' ? 'pb-[68px] overflow-hidden sm:pb-[72px]' : 'pb-[80px] sm:pb-[90px]'}`}>
           <div className={`h-full w-full mx-auto ${activeTab === 'send' ? '' : 'max-w-7xl'}`}>
             {renderContent()}
           </div>
         </main>
 
-        <nav className="md:hidden absolute bottom-0 left-0 right-0 z-50 h-[72px] bg-[#0d0e14]/90 backdrop-blur border-t border-white/10">
-          <div className="flex items-center justify-around h-full px-2">
+        <nav className="md:hidden absolute bottom-0 left-0 right-0 z-50 h-[68px] bg-[#0d0e14]/95 backdrop-blur-xl border-t border-white/10 pb-[env(safe-area-inset-bottom)] sm:h-[72px]">
+          <div className="flex items-center justify-around h-full px-1 sm:px-2">
             {NAV.map(({ id, label, Icon }) => {
               const active = activeTab === id;
               return (
-                <button key={id} type="button" onClick={() => handleTabChange(id)} className="flex-1 flex flex-col items-center gap-1">
-                  <div className={`p-2 rounded-2xl ${active ? (id === 'send' ? 'bg-[#ffb300] text-black' : 'bg-blue-600 text-white') : 'text-gray-500'}`}>
+                <button key={id} type="button" onClick={() => handleTabChange(id)} className="flex-1 flex flex-col items-center gap-0.5 py-1.5 active:scale-95 transition-all sm:gap-1">
+                  <div className={`p-1.5 rounded-xl transition-all sm:p-2 sm:rounded-2xl ${active ? (id === 'send' ? 'bg-[#ffb300] text-black' : 'bg-blue-600 text-white') : 'text-gray-500'}`}>
                     <Icon className="w-5 h-5" />
                   </div>
-                  <span className={`text-[8px] font-black uppercase ${active ? 'text-white' : 'text-gray-600'}`}>{label}</span>
+                  <span className={`text-[7px] font-black uppercase tracking-wider sm:text-[8px] ${active ? 'text-white' : 'text-gray-600'}`}>{label}</span>
                 </button>
               );
             })}

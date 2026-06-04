@@ -6,11 +6,12 @@ import { WITHDRAWAL_LIMIT } from '../types/account';
 
 interface WithdrawModalProps {
   balance: number;
+  accountMode?: 'demo' | 'real';
   onClose: () => void;
   onWithdraw: (amount: number) => void;
 }
 
-const WithdrawModal: React.FC<WithdrawModalProps> = ({ balance, onClose, onWithdraw }) => {
+const WithdrawModal: React.FC<WithdrawModalProps> = ({ balance, accountMode = 'real', onClose, onWithdraw }) => {
   const [amount, setAmount] = useState('');
   const [step, setStep] = useState<'form' | 'success'>('form');
   const [error, setError] = useState('');
@@ -61,12 +62,17 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ balance, onClose, onWithd
         {step === 'form' ? (
           <>
             {/* Warning Banner */}
-            <div className="flex items-start gap-3 p-4 rounded-2xl bg-[#ffb300]/10 border border-[#ffb300]/25">
-              <AlertCircle className="w-5 h-5 text-[#ffb300] shrink-0 mt-0.5" />
+            <div className={`flex items-start gap-3 p-4 rounded-2xl border ${accountMode === 'demo' ? 'bg-blue-500/10 border-blue-500/25' : 'bg-[#ffb300]/10 border-[#ffb300]/25'}`}>
+              <AlertCircle className={`w-5 h-5 shrink-0 mt-0.5 ${accountMode === 'demo' ? 'text-blue-400' : 'text-[#ffb300]'}`} />
               <div>
-                <p className="text-[12px] font-black text-[#ffb300] mb-1">Real Account Only</p>
+                <p className={`text-[12px] font-black mb-1 ${accountMode === 'demo' ? 'text-blue-400' : 'text-[#ffb300]'}`}>
+                  {accountMode === 'demo' ? 'Demo Mode · Simulated' : 'Real Account Only'}
+                </p>
                 <p className="text-[11px] text-gray-300 font-bold leading-relaxed">
-                  Withdrawals are processed within 1–3 business days. Max ₹{WITHDRAWAL_LIMIT.toLocaleString('en-IN')} per request.
+                  {accountMode === 'demo'
+                    ? 'This is a simulated withdrawal. No real money is transferred. Max ₹1,000 per request.'
+                    : `Withdrawals are processed within 1–3 business days. Max ₹${WITHDRAWAL_LIMIT.toLocaleString('en-IN')} per request.`
+                  }
                 </p>
               </div>
             </div>
@@ -179,10 +185,17 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ balance, onClose, onWithd
             </div>
             <div className="bg-[#161821] border border-white/5 rounded-2xl p-4 space-y-2">
               <div className="flex items-center justify-center gap-2">
-                <Clock className="w-4 h-4 text-[#ffb300]" />
-                <span className="text-[11px] font-black text-[#ffb300]">Processing: 1–3 business days</span>
+                <Clock className={`w-4 h-4 ${accountMode === 'demo' ? 'text-blue-400' : 'text-[#ffb300]'}`} />
+                <span className={`text-[11px] font-black ${accountMode === 'demo' ? 'text-blue-400' : 'text-[#ffb300]'}`}>
+                  {accountMode === 'demo' ? 'Simulated · No real transfer' : 'Processing: 1–3 business days'}
+                </span>
               </div>
-              <p className="text-[10px] text-gray-500 text-center">You'll receive funds in your linked bank account via UPI</p>
+              <p className="text-[10px] text-gray-500 text-center">
+                {accountMode === 'demo'
+                  ? 'Demo withdrawal recorded in your activity'
+                  : "You'll receive funds in your linked bank account via UPI"
+                }
+              </p>
             </div>
             <button type="button" onClick={onClose} className="w-full py-4 bg-[#2d2e3b] rounded-2xl font-black text-sm">
               Done

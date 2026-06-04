@@ -30,7 +30,6 @@ function CandlestickChart({ candles, livePrice }: { candles: Candle[]; livePrice
   const volMax = Math.max(...candles.map(c => c.volume), 1);
 
   const toY = (p: number) => PAD.top + ((maxP - p) / range) * candleH;
-  const toVolY = (v: number) => PAD.top + candleH + 4 + VOL_H - (v / volMax) * VOL_H;
   const barW = Math.max(2, (chartW / candles.length) - 0.5);
 
   // Moving averages
@@ -230,7 +229,7 @@ function TradeModal({ market, side, price, onClose }: {
         onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-2">
           <div className="flex flex-col">
-            <h3 className={`text-3xl font-black italic tracking-tighter ${isBuy ? 'text-green-500' : 'text-red-500'}`}>
+            <h3 className={`text-3xl font-black tracking-tighter ${isBuy ? 'text-green-500' : 'text-red-500'}`}>
               {isBuy ? 'LONG' : 'SHORT'} {market.symbol.split('/')[0]}
             </h3>
             <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest mt-1">Execution Terminal</span>
@@ -422,11 +421,11 @@ const TradingView: React.FC = () => {
             </div>
             <div className="text-left">
               <div className="flex items-center gap-2">
-                <span className="font-black text-xl italic tracking-tighter">{activeMarket.symbol}</span>
+                <span className="font-black text-xl tracking-tighter">{activeMarket.symbol}</span>
                 <ChevronDown className={`w-5 h-5 text-gray-500 transition-transform ${showMarkets ? 'rotate-180' : ''}`} />
               </div>
               <div className="flex items-center gap-3 mt-1">
-                <span className="font-mono font-black text-blue-500 text-sm italic">{fmtPrice}</span>
+                <span className="font-mono font-black text-blue-500 text-sm">{fmtPrice}</span>
                 <div className={`px-2 py-0.5 rounded-md text-[10px] font-black ${isUp ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
                   {isUp ? '+' : '-'}{Math.abs(activeMarket.change24h).toFixed(2)}%
                 </div>
@@ -488,7 +487,7 @@ const TradingView: React.FC = () => {
               <div className="grid grid-cols-3 text-[10px] font-black text-gray-500 uppercase tracking-widest px-2 pb-2 border-b border-white/5">
                 <span>Price</span><span className="text-center">Size</span><span className="text-right">Total</span>
               </div>
-              <div className="space-y-0.5 font-mono italic">
+              <div className="space-y-0.5 font-mono">
                 {[...orderBook.asks].reverse().map((a, i) => (
                   <OrderBookRow key={i} price={a.price} amount={a.amount} total={a.total}
                     side="ask" maxTotal={maxTotal} />
@@ -496,14 +495,14 @@ const TradingView: React.FC = () => {
               </div>
               <div className="flex items-center justify-center py-4 bg-white/[0.02] rounded-2xl border border-white/5 relative overflow-hidden group">
                 <div className={`absolute inset-0 bg-gradient-to-r ${isUp ? 'from-green-500/5' : 'from-red-500/5'} to-transparent`} />
-                <span className={`text-3xl font-black font-mono italic tracking-tighter relative z-10 ${isUp ? 'text-green-500' : 'text-red-500'}`}>
+                <span className={`text-3xl font-black font-mono tracking-tighter relative z-10 ${isUp ? 'text-green-500' : 'text-red-500'}`}>
                   {fmtPrice}
                 </span>
                 <span className={`ml-3 relative z-10 ${isUp ? 'text-green-500' : 'text-red-500'}`}>
                   {isUp ? <TrendingUp className="w-6 h-6 stroke-[3]" /> : <TrendingDown className="w-6 h-6 stroke-[3]" />}
                 </span>
               </div>
-              <div className="space-y-0.5 font-mono italic">
+              <div className="space-y-0.5 font-mono">
                 {orderBook.bids.map((b, i) => (
                   <OrderBookRow key={i} price={b.price} amount={b.amount} total={b.total}
                     side="bid" maxTotal={maxTotal} />
@@ -518,12 +517,12 @@ const TradingView: React.FC = () => {
       <div className="px-6 pb-8 pt-4 border-t border-white/5 bg-[#0d0e14] shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
         <div className="grid grid-cols-2 gap-5">
           <button onClick={() => setTradeModal({ side: 'buy' })}
-            className="h-16 bg-green-500 hover:bg-green-400 rounded-3xl font-black text-xl italic tracking-tighter text-white shadow-[0_10px_30px_rgba(34,197,94,0.3)] transition-all active:scale-95 flex items-center justify-center gap-3 border-b-4 border-green-700">
+            className="h-16 bg-green-500 hover:bg-green-400 rounded-3xl font-black text-xl tracking-tighter text-white shadow-[0_10px_30px_rgba(34,197,94,0.3)] transition-all active:scale-95 flex items-center justify-center gap-3 border-b-4 border-green-700">
             <TrendingUp className="w-6 h-6 stroke-[3]" />
             <span>LONG</span>
           </button>
           <button onClick={() => setTradeModal({ side: 'sell' })}
-            className="h-16 bg-red-500 hover:bg-red-400 rounded-3xl font-black text-xl italic tracking-tighter text-white shadow-[0_10px_30px_rgba(239,68,68,0.3)] transition-all active:scale-95 flex items-center justify-center gap-3 border-b-4 border-red-700">
+            className="h-16 bg-red-500 hover:bg-red-400 rounded-3xl font-black text-xl tracking-tighter text-white shadow-[0_10px_30px_rgba(239,68,68,0.3)] transition-all active:scale-95 flex items-center justify-center gap-3 border-b-4 border-red-700">
             <TrendingDown className="w-6 h-6 stroke-[3]" />
             <span>SHORT</span>
           </button>
@@ -536,7 +535,7 @@ const TradingView: React.FC = () => {
           <div className="flex flex-col h-full p-6">
             <div className="flex items-center justify-between mb-8">
               <div className="flex flex-col">
-                <h3 className="font-black text-4xl italic tracking-tighter">MARKETS</h3>
+                <h3 className="font-black text-4xl tracking-tighter">MARKETS</h3>
                 <span className="text-[10px] font-black text-blue-500 uppercase tracking-[0.4em] mt-1">Global Liquidity Pool</span>
               </div>
               <button onClick={() => setShowMarkets(false)} className="p-3 bg-white/5 rounded-2xl"><X className="w-8 h-8 text-white" /></button>
@@ -546,7 +545,7 @@ const TradingView: React.FC = () => {
               <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-6 h-6 text-gray-500" />
               <input type="text" placeholder="Search Assets..." value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full bg-[#161821] border-2 border-white/5 rounded-[2rem] py-5 pl-14 pr-6 text-lg font-black italic tracking-tight focus:outline-none focus:border-blue-500/50 transition-all shadow-inner"
+                className="w-full bg-[#161821] border-2 border-white/5 rounded-[2rem] py-5 pl-14 pr-6 text-lg font-black tracking-tight focus:outline-none focus:border-blue-500/50 transition-all shadow-inner"
               />
             </div>
 

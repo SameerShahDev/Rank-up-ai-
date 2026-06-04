@@ -47,6 +47,7 @@ interface AuthContextValue {
   addTransactionDb: (tx: Record<string, string>) => Promise<void>;
   depositReal: (amount: number, method?: string) => Promise<{ success: boolean; error?: string }>;
   withdrawReal: (amount: number) => Promise<{ success: boolean; error?: string }>;
+  withdrawFake: (amount: number) => { success: boolean };
   loadTransactions: () => Promise<Record<string, string>[] | null>;
   userSettings: UserSettings;
   accountStats: AccountStats | null;
@@ -273,6 +274,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return res;
   }, [profile, refreshDashboard]);
 
+  const withdrawFake = useCallback((amount: number) => {
+    setDemoBalance(prev => Math.max(0, prev - amount));
+    return { success: true };
+  }, []);
+
   const loadTransactions = useCallback(async () => {
     if (!profile) return null;
     return fetchTransactionsFromDb();
@@ -313,6 +319,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     addTransactionDb,
     depositReal,
     withdrawReal,
+    withdrawFake,
     loadTransactions,
     userSettings,
     accountStats,
@@ -324,7 +331,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }), [
     profile, isLoading, accountMode, demoBalance, realBalance, activeBalance,
     setActiveBalance, completeLogin, logout, persistBalances, addTransactionDb,
-    depositReal, withdrawReal, loadTransactions, userSettings, accountStats,
+    depositReal, withdrawReal, withdrawFake, loadTransactions, userSettings, accountStats,
     settingsLoading, refreshDashboard, updateUserSettings, renameProfile,
   ]);
 
