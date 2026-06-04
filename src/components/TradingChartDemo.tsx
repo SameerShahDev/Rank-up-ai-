@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import TradingChart from "./trade/TradingChart";
+import ChartCanvas from "./trade/ChartCanvas";
 import { getLiveCandles, getLivePrice, tickPrices, type Candle } from "../utils/marketData";
 
-/* ─── Active trade type ──────────────────────────────────────────────────── */
-interface ActiveTrade {
+/* ─── Trade type ─────────────────────────────────────────────────────────── */
+interface Trade {
   id: string;
   type: "UP" | "DOWN";
   entryPrice: number;
@@ -15,87 +15,58 @@ interface ActiveTrade {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   TRADING CHART DEMO — Isolated chart visualization only
+   STANDALONE CHART DEMO — No header, footer, or tabs.
+   Pure chart visualization only.
    ═══════════════════════════════════════════════════════════════════════════ */
 const TradingChartDemo: React.FC = () => {
   const [candles, setCandles] = useState<Candle[]>([]);
   const [livePrice, setLivePrice] = useState(0);
-  const [activeTrades, setActiveTrades] = useState<ActiveTrade[]>([]);
-  const [primaryTrade, setPrimaryTrade] = useState<ActiveTrade | null>(null);
+  const [trades, setTrades] = useState<Trade[]>([]);
+  const [activeTrade, setActiveTrade] = useState<Trade | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const SYMBOL = "BTC/INR";
 
-  /* ── Initialize candle data + live price ──────────────────────────── */
+  /* ── Live data feed ─────────────────────────────────────────────── */
   useEffect(() => {
     const load = () => {
-      const c = getLiveCandles(SYMBOL, 200);
-      setCandles(c);
+      setCandles(getLiveCandles(SYMBOL, 200));
       setLivePrice(getLivePrice(SYMBOL));
     };
     load();
-    // Tick market data every 600ms
-    tickRef.current = setInterval(() => {
-      tickPrices();
-      load();
-    }, 600);
-    return () => {
-      if (tickRef.current) clearInterval(tickRef.current);
-    };
+    tickRef.current = setInterval(() => { tickPrices(); load(); }, 600);
+    return () => { if (tickRef.current) clearInterval(tickRef.current); };
   }, []);
 
-  /* ── Create a demo trade on mount ────────────────────────────────── */
+  /* ── Demo trade with countdown ──────────────────────────────────── */
   useEffect(() => {
     const entry = getLivePrice(SYMBOL);
-    const trade: ActiveTrade = {
-      id: "demo-1",
-      type: "UP",
-      entryPrice: entry,
-      amount: 100,
-      duration: 60,
-      timeLeft: 46,
-    };
-    setPrimaryTrade(trade);
-    setActiveTrades([trade]);
+    const t: Trade = { id: "d1", type: "UP", entryPrice: entry, amount: 100, duration: 60, timeLeft: 46 };
+    setActiveTrade(t);
+    setTrades([t]);
 
-    // Countdown timer
     countdownRef.current = setInterval(() => {
-      setPrimaryTrade((prev) => {
+      setActiveTrade(prev => {
         if (!prev) return prev;
-        const newTime = prev.timeLeft - 1;
-        if (newTime <= 0) {
-          // Reset with new trade
-          const newEntry = getLivePrice(SYMBOL);
-          const newTrade: ActiveTrade = {
-            id: `demo-${Date.now()}`,
-            type: Math.random() > 0.5 ? "UP" : "DOWN",
-            entryPrice: newEntry,
-            amount: 100,
-            duration: 60,
-            timeLeft: 60,
-          };
-          setActiveTrades([newTrade]);
-          return newTrade;
+        const next = prev.timeLeft - 1;
+        if (next <= 0) {
+          const ne = getLivePrice(SYMBOL);
+          const nt: Trade = { id: `d${Date.now()}`, type: Math.random() > 0.5 ? "UP" : "DOWN", entryPrice: ne, amount: 100, duration: 60, timeLeft: 60 };
+          setTrades([nt]);
+          return nt;
         }
-        const updated = { ...prev, timeLeft: newTime };
-        setActiveTrades([updated]);
-        return updated;
+        const up = { ...prev, timeLeft: next };
+        setTrades([up]);
+        return up;
       });
     }, 1000);
-    return () => {
-      if (countdownRef.current) clearInterval(countdownRef.current);
-    };
+    return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
   }, []);
 
   return (
-    <div className="w-full h-full bg-[#1a1a2e]">
-      <TradingChart
-        candles={candles}
-        livePrice={livePrice}
-        activeTrades={activeTrades}
-        primaryTrade={primaryTrade}
-      />
+    <div className="w-full h-full bg-[#111119]">
+      <ChartCanvas candles={candles} livePrice={livePrice} trades={trades} activeTrade={activeTrade} />
     </div>
   );
 };
