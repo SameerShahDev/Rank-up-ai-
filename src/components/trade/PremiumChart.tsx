@@ -1235,6 +1235,7 @@ const PremiumChart: React.FC<PremiumChartProps> = ({
             key={key}
             type="button"
             onClick={() => setter(!state)}
+            onTouchEnd={(e) => { e.preventDefault(); setter(!state); }}
             className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider transition-all"
             style={{
               background: state ? `${color}20` : 'rgba(255,255,255,0.03)',
