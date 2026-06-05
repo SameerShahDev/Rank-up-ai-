@@ -129,14 +129,18 @@ const TradeChart: React.FC<TradeChartProps> = ({ trades = [], activeTrade = null
     }
 
     for (const t of trades) {
-      if (lines.has(t.id)) continue;
+      const existing = lines.get(t.id);
+      if (existing) {
+        existing.applyOptions({ title: `${t.type === "UP" ? "↑" : "↓"} ${t.type} ₹${t.amount} - ${t.timeLeft}s` });
+        continue;
+      }
       const line = cs.createPriceLine({
         price: t.entryPrice,
         color: t.type === "UP" ? "#10B981" : "#F43F5E",
-        lineWidth: 1,
+        lineWidth: 2,
         lineStyle: 2,
         axisLabelVisible: true,
-        title: `${t.type === "UP" ? "↑" : "↓"} ${t.type} ₹${t.amount}`,
+        title: `${t.type === "UP" ? "↑" : "↓"} ${t.type} ₹${t.amount} - ${t.timeLeft}s`,
       });
       lines.set(t.id, line);
     }
