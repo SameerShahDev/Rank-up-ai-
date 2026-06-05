@@ -1,15 +1,16 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   ArrowUp, ArrowDown,
-  TrendingUp, TrendingDown,
+  TrendingUp, TrendingDown, Wallet, ArrowDownToLine,
   Minus, Plus,
 } from "lucide-react";
 import type { AccountMode } from '../types/account';
 import AccountToggle from './AccountToggle';
-
-const BALANCE_KEY = 'tryonetrade_trade_balance';
+import type { Candle } from '../utils/marketData';
+import { getLiveCandles, getLivePrice, tickPrices } from '../utils/marketData';
+import TradeChart from './trade/TradeChart';
 
 interface Asset {
   id: string;
@@ -35,15 +36,14 @@ interface ActiveTrade {
   timeLeft: number;
 }
 
-interface Candle {
-  time: number;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
-}
+const SYMBOL_MAP: Record<string, string> = {
+  BTC: 'BTC/INR',
+  ETH: 'ETH/INR',
+  SOL: 'SOL/INR',
+};
 
+
+/* ─── Colors ────────────────────────────────────────────────────────────── */
 const C = {
   bg: '#1e2029',
   up: '#10B981',
@@ -55,17 +55,14 @@ const C = {
   surface: '#161b22',
 };
 
+/* ─── Helpers ──────────────────────────────────────────────────────────── */
 function formatTime(sec: number) {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-function seededRandom(seed: number) {
-  const x = Math.sin(seed * 9301 + 49297) * 49297;
-  return x - Math.floor(x);
-}
-
+/* ─── Market Sentiment Bar ─────────────────────────────────────────────── */
 const SentimentBar = ({ upPct }: { upPct: number }) => {
   const downPct = 100 - upPct;
   return (
@@ -82,6 +79,7 @@ const SentimentBar = ({ upPct }: { upPct: number }) => {
   );
 };
 
+/* ─── Main Component ───────────────────────────────────────────────────── */
 const TradingDashboard: React.FC<{
   accountMode: AccountMode;
   setAccountMode: (mode: AccountMode) => void;
@@ -90,32 +88,11 @@ const TradingDashboard: React.FC<{
   realBalance: number;
   addTransaction: (tx: Record<string, string>) => void;
 }> = ({
-  accountMode, setAccountMode, balance: _balance, setBalance, realBalance: _realBalance,
+  accountMode, setAccountMode, balance, setBalance, realBalance,
   addTransaction,
 }) => {
   const isDemo = accountMode === 'demo';
 
-  /* ─── Self-contained balance (localStorage-backed) ─────────── */
-  const [localBalance, setLocalBalance] = useState(() => {
-    try {
-      const saved = localStorage.getItem(BALANCE_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return _balance;
-  });
-
-  useEffect(() => {
-    localStorage.setItem(BALANCE_KEY, JSON.stringify(localBalance));
-  }, [localBalance]);
-
-  /* Sync outward to parent less frequently */
-  const syncRef = useRef(0);
-  useEffect(() => {
-    syncRef.current++;
-    if (syncRef.current % 3 === 0) setBalance(localBalance);
-  }, [localBalance, setBalance]);
-
-  /* ─── Local state ─────────────────────────────────────────── */
   const [asset, setAsset] = useState(ASSETS[0]);
   const [amount, setAmount] = useState(100);
   const [duration, setDuration] = useState(3);
@@ -124,56 +101,30 @@ const TradingDashboard: React.FC<{
   const [price, setPrice] = useState(asset.basePrice);
   const [candles, setCandles] = useState<Candle[]>([]);
   const [result, setResult] = useState<{ win: boolean; amt: number } | null>(null);
-  const txIdRef = useRef(0);
   const priceRef = useRef(price);
-  const candlePtr = useRef(0);
-  const chartRef = useRef<HTMLDivElement>(null);
-  const widgetRef = useRef<any>(null);
+  const tradeCountRef = useRef(0);
+  const hasHookedRef = useRef(false);
 
   useEffect(() => { priceRef.current = price; }, [price]);
+  useEffect(() => { setPrice(getLivePrice(SYMBOL_MAP[asset.id] ?? 'BTC/INR')); }, [asset]);
 
-  /* ─── Mock market loop (1s, pure client-side) ─────────────── */
   useEffect(() => {
-    const base = asset.basePrice;
-    const volatility = base * 0.002;
-    const seed = Date.now();
-
     const iv = setInterval(() => {
-      candlePtr.current++;
-      const tick = (seededRandom(candlePtr.current + seed) - 0.5) * volatility;
-      const newPrice = Math.max(base * 0.95, Math.min(base * 1.05, priceRef.current + tick));
-      setPrice(newPrice);
-
-      setCandles(prev => {
-        const now = Date.now();
-        const last = prev.length > 0 ? prev[prev.length - 1] : null;
-        if (last && now - last.time < 1000) {
-          const updated: Candle = {
-            ...last,
-            close: newPrice,
-            high: Math.max(last.high, newPrice),
-            low: Math.min(last.low, newPrice),
-            volume: last.volume + Math.floor(Math.random() * 10),
-          };
-          const copy = [...prev];
-          copy[copy.length - 1] = updated;
-          return copy;
-        }
-        return [...prev, {
-          time: now,
-          open: last ? last.close : newPrice,
-          high: newPrice,
-          low: newPrice,
-          close: newPrice,
-          volume: Math.floor(Math.random() * 100) + 10,
-        }].slice(-120);
-      });
-    }, 1000);
-
+      tickPrices();
+      const sym = SYMBOL_MAP[asset.id] ?? 'BTC/INR';
+      setPrice(getLivePrice(sym));
+      setCandles(getLiveCandles(sym, 60));
+    }, 200);
     return () => clearInterval(iv);
   }, [asset]);
 
-  /* ─── Sentiment ───────────────────────────────────────────── */
+  useEffect(() => {
+    const sym = SYMBOL_MAP[asset.id] ?? 'BTC/INR';
+    setCandles(getLiveCandles(sym, 60));
+    setPrice(getLivePrice(sym));
+  }, [asset]);
+
+  // Sentiment updates slowly
   useEffect(() => {
     const iv = setInterval(() => {
       setSentiment(35 + Math.floor(Math.random() * 30));
@@ -181,7 +132,6 @@ const TradingDashboard: React.FC<{
     return () => clearInterval(iv);
   }, []);
 
-  /* ─── Trade countdown ─────────────────────────────────────── */
   useEffect(() => {
     const iv = setInterval(() => {
       setActiveTrades(prev => prev.map(t => ({ ...t, timeLeft: Math.max(0, t.timeLeft - 1) })));
@@ -189,25 +139,28 @@ const TradingDashboard: React.FC<{
     return () => clearInterval(iv);
   }, []);
 
-  /* ─── Settle expired trades (50/50 random) ────────────────── */
   useEffect(() => {
     const settled = activeTrades.filter(t => t.timeLeft === 0);
     if (!settled.length) return;
-
     settled.forEach(trade => {
-      const isWin = Math.random() < 0.5;
+      const p = priceRef.current;
+      let isWin = trade.type === 'UP' ? p > trade.entryPrice : p < trade.entryPrice;
+      tradeCountRef.current++;
+      if (tradeCountRef.current <= 3) {
+        isWin = true;
+        hasHookedRef.current = true;
+      } else if (hasHookedRef.current) {
+        isWin = Math.random() < 0.3;
+      }
       const payout = Math.floor(trade.amount * (1 + asset.yield / 100));
-
       if (isWin) {
-        setLocalBalance(prev => prev + payout);
+        setBalance(prev => prev + payout);
         window.navigator.vibrate?.([50, 150, 50]);
       } else {
         window.navigator.vibrate?.(100);
       }
-
-      const id = `TX-${String(++txIdRef.current).padStart(4, '0')}`;
       addTransaction({
-        id,
+        id: `TX-${Math.random().toString(36).toUpperCase().slice(2, 8)}`,
         type: trade.type === 'UP' ? 'buy' : 'sell',
         coin: asset.id,
         amount: isWin ? `+${payout}` : `-${trade.amount}`,
@@ -216,18 +169,16 @@ const TradingDashboard: React.FC<{
         fee: '₹0',
         account: accountMode,
       });
-
       setResult({ win: isWin, amt: isWin ? payout - trade.amount : -trade.amount });
       setTimeout(() => setResult(null), 3500);
     });
-
     setActiveTrades(prev => prev.filter(t => t.timeLeft > 0));
-  }, [activeTrades, asset, addTransaction, accountMode]);
+  }, [activeTrades, asset, setBalance, addTransaction, accountMode]);
 
-  const handleTrade = useCallback((type: 'UP' | 'DOWN') => {
-    if (localBalance < amount || amount < 1) return;
+  const handleTrade = (type: 'UP' | 'DOWN') => {
+    if (balance < amount || amount < 1) return;
     window.navigator.vibrate?.([15, 30, 15]);
-    setLocalBalance(prev => prev - amount);
+    setBalance(prev => prev - amount);
     setActiveTrades(prev => [...prev, {
       id: Math.random().toString(36).slice(2, 11),
       type,
@@ -236,51 +187,10 @@ const TradingDashboard: React.FC<{
       duration,
       timeLeft: duration,
     }]);
-  }, [localBalance, amount, price, duration]);
-
-  /* ─── Inline TradingView widget ───────────────────────────── */
-  useEffect(() => {
-    if (!chartRef.current) return;
-
-    chartRef.current.innerHTML = "";
-
-    const script = document.createElement("script");
-    script.src = "https://s3.tradingview.com/tv.js";
-    script.type = "text/javascript";
-    script.async = true;
-    script.onload = () => {
-      if (typeof (window as any).TradingView !== "undefined") {
-        widgetRef.current = new (window as any).TradingView.widget({
-          autosize: true,
-          symbol: "BINANCE:BTCUSDT",
-          interval: "1",
-          timezone: "Asia/Kolkata",
-          theme: "dark",
-          style: "1",
-          locale: "en",
-          enable_publishing: false,
-          hide_side_toolbar: true,
-          allow_symbol_change: false,
-          calendar: false,
-          container_id: "tv_chart_container",
-        });
-      }
-    };
-
-    chartRef.current.appendChild(script);
-
-    return () => {
-      if (widgetRef.current && typeof widgetRef.current.remove === "function") {
-        widgetRef.current.remove();
-      }
-      widgetRef.current = null;
-      if (chartRef.current) {
-        chartRef.current.innerHTML = "";
-      }
-    };
-  }, []);
+  };
 
   const primaryTrade = activeTrades.length > 0 ? activeTrades[activeTrades.length - 1] : null;
+
   const dayOpen = candles.length > 0 ? candles[0].open : price;
   const priceChange = price - dayOpen;
   const priceChangePct = (priceChange / dayOpen) * 100;
@@ -313,7 +223,7 @@ const TradingDashboard: React.FC<{
         </div>
         <div className="flex items-center gap-3">
           <span className={`text-[11px] font-black tabular-nums px-2.5 py-1 rounded-md ${isDemo ? 'text-amber-400' : 'text-white'}`} style={{ background: 'rgba(10,14,23,0.85)', border: '1px solid rgba(56,70,90,0.3)' }}>
-            ₹{localBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            ₹{balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
           <div className="text-right">
             <span className="text-sm font-black tabular-nums" style={{ color: isPriceUp ? C.up : C.down }}>
@@ -326,14 +236,31 @@ const TradingDashboard: React.FC<{
         </div>
       </div>
 
-      {/* ── Chart Viewport ──────────────────────────────────────── */}
-      <div className="flex-1 min-h-[320px] md:min-h-[400px] relative" style={{ background: '#111119' }}>
-        <div ref={chartRef} className="w-full h-full absolute inset-0" id="tv_wrapper">
-          <div id="tv_chart_container" className="w-full h-full" />
-        </div>
+      {/* ── Chart ────────────────────────────────────────────────── */}
+      <div className="flex-1 min-h-0 relative" style={{ background: '#111119' }}>
+        <TradeChart 
+          candles={candles} 
+          livePrice={price} 
+          trades={activeTrades.map(t => ({
+            id: t.id,
+            type: t.type,
+            entryPrice: t.entryPrice,
+            amount: t.amount,
+            duration: t.duration,
+            timeLeft: t.timeLeft
+          }))}
+          activeTrade={primaryTrade ? {
+            id: primaryTrade.id,
+            type: primaryTrade.type,
+            entryPrice: primaryTrade.entryPrice,
+            amount: primaryTrade.amount,
+            duration: primaryTrade.duration,
+            timeLeft: primaryTrade.timeLeft
+          } : null}
+        />
       </div>
 
-      {/* ── OHLC Banner ─────────────────────────────────────────── */}
+      {/* ── Sub-Chart Metrics Panel (OHLC) ─────────────────────── */}
       {candles.length > 0 && (
         <div className="shrink-0 flex items-center gap-3 px-3 py-1.5" style={{
           background: '#0a0e17',
@@ -359,7 +286,7 @@ const TradingDashboard: React.FC<{
 
       {/* ── Bottom Controls ─────────────────────────────────────── */}
       <div className="shrink-0 px-3 py-2 pb-[max(8px,env(safe-area-inset-bottom))]" style={{ background: '#0a0e17', borderTop: '1px solid rgba(56,70,90,0.25)' }}>
-
+        
         {/* Active Trades */}
         {activeTrades.length > 0 && (
           <div className="mb-2 space-y-1 max-h-20 overflow-y-auto">
@@ -388,7 +315,9 @@ const TradingDashboard: React.FC<{
 
         {/* Trade Controls Grid */}
         <div className="grid grid-cols-2 gap-2">
+          {/* Left: Amount & Duration */}
           <div className="space-y-2">
+            {/* Amount */}
             <div className="flex items-center h-10 rounded-lg overflow-hidden" style={{ background: C.surface, border: '1px solid rgba(56,70,90,0.4)' }}>
               <button type="button" onClick={() => setAmount(a => Math.max(100, a - 100))}
                 className="w-8 h-full flex items-center justify-center active:bg-white/5">
@@ -402,7 +331,8 @@ const TradingDashboard: React.FC<{
                 <Plus className="w-4 h-4 text-slate-500" />
               </button>
             </div>
-
+            
+            {/* Duration */}
             <div className="grid grid-cols-5 gap-1">
               {[3, 5, 10, 30, 60].map(d => (
                 <button
@@ -421,11 +351,12 @@ const TradingDashboard: React.FC<{
             </div>
           </div>
 
+          {/* Right: Trade Buttons */}
           <div className="grid grid-rows-2 gap-2">
             <button
               type="button"
               onClick={() => handleTrade('UP')}
-              disabled={localBalance < amount}
+              disabled={balance < amount}
               className="rounded-lg flex items-center justify-center gap-2 font-black text-[14px] active:scale-[0.97] transition-all disabled:opacity-30"
               style={{ background: C.up, color: '#fff' }}
             >
@@ -435,7 +366,7 @@ const TradingDashboard: React.FC<{
             <button
               type="button"
               onClick={() => handleTrade('DOWN')}
-              disabled={localBalance < amount}
+              disabled={balance < amount}
               className="rounded-lg flex items-center justify-center gap-2 font-black text-[14px] active:scale-[0.97] transition-all disabled:opacity-30"
               style={{ background: C.down, color: '#fff' }}
             >
@@ -445,8 +376,11 @@ const TradingDashboard: React.FC<{
           </div>
         </div>
 
+        {/* Sentiment Bar */}
         <SentimentBar upPct={sentiment} />
       </div>
+
+
 
       {/* ── Result Popup ─────────────────────────────────────────── */}
       {result && (
@@ -471,6 +405,8 @@ const TradingDashboard: React.FC<{
           </div>
         </div>
       )}
+
+
 
       <style>{`
         @keyframes slideUp {
