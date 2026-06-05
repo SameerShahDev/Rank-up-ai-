@@ -170,7 +170,7 @@ const ChartCanvas: React.FC<Props> = ({ candles, livePrice, trades, activeTrade 
     if (!candles.length) return;
     setRange(prev => {
       if (prev.s === 0 && prev.e === 0) {
-        const n = Math.min(80, candles.length);
+        const n = Math.min(120, candles.length);
         return { s: candles.length - n, e: candles.length - 1 };
       }
       if (prev.e >= candles.length - 2) {
@@ -194,8 +194,8 @@ const ChartCanvas: React.FC<Props> = ({ candles, livePrice, trades, activeTrade 
           const rect = el.getBoundingClientRect();
           const mouseX = e.clientX - rect.left;
           const ratio = Math.min(1, Math.max(0, (mouseX - 0) / (rect.width - 64)));
-          const delta = e.deltaY > 0 ? 3 : -3;
-          const nn = Math.max(12, Math.min(candles.length, n + delta));
+          const delta = e.deltaY > 0 ? 5 : -5;
+          const nn = Math.max(8, Math.min(candles.length, n + delta));
           const shrink = n - nn;
           const sOff = Math.round(shrink * ratio);
           return {
@@ -750,6 +750,32 @@ const ChartCanvas: React.FC<Props> = ({ candles, livePrice, trades, activeTrade 
     return () => clearInterval(iv);
   }, [draw]);
 
+  const handleZoomIn = () => {
+    setRange(p => {
+      const n = p.e - p.s + 1;
+      const nn = Math.max(8, Math.floor(n * 0.7));
+      const shrink = n - nn;
+      const sOff = Math.floor(shrink * 0.5);
+      return {
+        s: Math.max(0, p.s + sOff),
+        e: Math.min(candles.length - 1, p.e - (shrink - sOff)),
+      };
+    });
+  };
+
+  const handleZoomOut = () => {
+    setRange(p => {
+      const n = p.e - p.s + 1;
+      const nn = Math.min(candles.length, Math.floor(n * 1.4));
+      const grow = nn - n;
+      const sOff = Math.floor(grow * 0.5);
+      return {
+        s: Math.max(0, p.s - sOff),
+        e: Math.min(candles.length - 1, p.e + (grow - sOff)),
+      };
+    });
+  };
+
   return (
     <div
       ref={wrapRef}
@@ -764,6 +790,29 @@ const ChartCanvas: React.FC<Props> = ({ candles, livePrice, trades, activeTrade 
       style={{ cursor: drag.current.on ? "grabbing" : hover ? "crosshair" : "default" }}
     >
       <canvas ref={cvsRef} className="absolute inset-0" />
+      
+      {/* Zoom Controls */}
+      <div className="absolute bottom-8 right-4 flex flex-col gap-2 z-10">
+        <button
+          type="button"
+          onClick={handleZoomIn}
+          className="w-10 h-10 bg-[#1a1d26] border border-white/10 rounded-lg flex items-center justify-center text-white hover:bg-[#252936] transition-colors"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          onClick={handleZoomOut}
+          className="w-10 h-10 bg-[#1a1d26] border border-white/10 rounded-lg flex items-center justify-center text-white hover:bg-[#252936] transition-colors"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 };
