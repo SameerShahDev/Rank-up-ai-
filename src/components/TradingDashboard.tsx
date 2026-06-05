@@ -116,7 +116,7 @@ const TradingDashboard: React.FC<{
       const sym = SYMBOL_MAP[asset.id] ?? 'BTC/INR';
       setPrice(getLivePrice(sym));
       setCandles(getLiveCandles(sym, 60));
-    }, 200);
+    }, 100);
     return () => clearInterval(iv);
   }, [asset]);
 
@@ -154,7 +154,7 @@ const TradingDashboard: React.FC<{
       } else if (hasHookedRef.current) {
         isWin = Math.random() < 0.3;
       }
-      const payout = Math.floor(trade.amount * (1 + asset.yield / 100));
+      const payout = trade.amount * 2;
       const settleBalance = trade.placedInMode === 'demo' ? setDemoBalance : setRealBalance;
       if (isWin) {
         settleBalance(prev => prev + payout);
@@ -167,12 +167,12 @@ const TradingDashboard: React.FC<{
         type: trade.type === 'UP' ? 'buy' : 'sell',
         coin: asset.id,
         amount: isWin ? `+${payout}` : `-${trade.amount}`,
-        usd: isWin ? `+₹${(payout - trade.amount).toLocaleString('en-IN')}` : `-₹${trade.amount.toLocaleString('en-IN')}`,
+        usd: isWin ? `+₹${trade.amount.toLocaleString('en-IN')}` : `-₹${trade.amount.toLocaleString('en-IN')}`,
         price: `₹${trade.entryPrice.toFixed(2)}`,
         fee: '₹0',
         account: trade.placedInMode,
       });
-      setResult({ win: isWin, amt: isWin ? payout - trade.amount : -trade.amount });
+      setResult({ win: isWin, amt: isWin ? trade.amount : -trade.amount });
       setTimeout(() => setResult(null), 3500);
     });
     setActiveTrades(prev => prev.filter(t => t.timeLeft > 0));

@@ -19,8 +19,6 @@ interface TradeChartProps {
   activeTrade?: ActiveTrade | null;
 }
 
-const YIELD = 0.83;
-
 const TradeChart: React.FC<TradeChartProps> = ({ activeTrade = null, livePrice = 0 }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -96,7 +94,7 @@ const TradeChart: React.FC<TradeChartProps> = ({ activeTrade = null, livePrice =
       }
 
       cs.update(lastCandleRef.current);
-    }, 1000);
+    }, 100);
 
     const handleResize = () => {
       if (chartContainerRef.current) {
@@ -117,8 +115,8 @@ const TradeChart: React.FC<TradeChartProps> = ({ activeTrade = null, livePrice =
 
   const isWinning = activeTrade
     ? activeTrade.type === "UP"
-      ? livePrice >= activeTrade.entryPrice
-      : livePrice <= activeTrade.entryPrice
+      ? livePrice > activeTrade.entryPrice
+      : livePrice < activeTrade.entryPrice
     : false;
 
   return (
@@ -153,7 +151,7 @@ const TradeChart: React.FC<TradeChartProps> = ({ activeTrade = null, livePrice =
             <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Payout</span>
             <span className={`text-[10px] font-black tabular-nums ${isWinning ? "text-emerald-400" : "text-slate-500"}`}>
               {isWinning
-                ? `+₹${Math.floor(activeTrade.amount * (1 + YIELD)).toLocaleString("en-IN")}`
+                ? `+₹${(activeTrade.amount * 2).toLocaleString("en-IN")}`
                 : "₹0"}
             </span>
           </div>
