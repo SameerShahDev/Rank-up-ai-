@@ -334,7 +334,7 @@ const ChartCanvas: React.FC<Props> = ({ candles, livePrice, trades, activeTrade 
 
     const AXIS_W = 64;
     const TIME_H = 24;
-    const XL = 0, XR = W - AXIS_W, CW = XR - XL;
+    const XL = AXIS_W, XR = W, CW = XR - XL;
     const YT = 0, YB = H - TIME_H, CH = YB - YT;
 
     if (candles.length < 2 || !haCache.length) return;
@@ -397,8 +397,8 @@ const ChartCanvas: React.FC<Props> = ({ candles, livePrice, trades, activeTrade 
       if (y < YT || y > YB) continue;
       ctx.beginPath(); ctx.moveTo(XL, y); ctx.lineTo(XR, y); ctx.stroke();
       ctx.fillStyle = C.axisLabel;
-      ctx.textAlign = "left";
-      ctx.fillText(fmt.axis(v), XR + 6, y);
+      ctx.textAlign = "right";
+      ctx.fillText(fmt.price(v), XL - 6, y);
     }
 
     const tStep = Math.max(1, vN / 6 | 0);
@@ -414,7 +414,7 @@ const ChartCanvas: React.FC<Props> = ({ candles, livePrice, trades, activeTrade 
     // Axis boundary lines
     ctx.strokeStyle = C.axisLine;
     ctx.beginPath(); ctx.moveTo(XL, snap(YB)); ctx.lineTo(XR, snap(YB)); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(snap(XR), YT + 1); ctx.lineTo(snap(XR), YB); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(snap(XL), YT + 1); ctx.lineTo(snap(XL), YB); ctx.stroke();
 
     /* ═════════════════════════════════════════════════════════════════
        CANDLES
@@ -472,29 +472,6 @@ const ChartCanvas: React.FC<Props> = ({ candles, livePrice, trades, activeTrade 
     ctx.setLineDash([]);
     ctx.globalAlpha = 1;
 
-    // Price badge on right axis
-    const tag = fmt.price(livePrice);
-    ctx.font = 'bold 9px "SF Mono",ui-monospace,Menlo,monospace';
-    const tW = ctx.measureText(tag).width + 12 | 0;
-    const tH = 18;
-    const tX = XR + 1;
-    const tY = Math.round(lpY - tH / 2);
-
-    ctx.fillStyle = lpCol;
-    roundRect(ctx, tX, tY, tW, tH, 3);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(tX, lpY);
-    ctx.lineTo(tX - 4, lpY - 3.5);
-    ctx.lineTo(tX - 4, lpY + 3.5);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.fillStyle = "#fff";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.fillText(tag, tX + 6, lpY);
-
     /* ═════════════════════════════════════════════════════════════════
        ENTRY LINES — dotted green + yellow ₹ tag
        ═════════════════════════════════════════════════════════════════ */
@@ -545,7 +522,7 @@ const ChartCanvas: React.FC<Props> = ({ candles, livePrice, trades, activeTrade 
        ═════════════════════════════════════════════════════════════════ */
     if (activeTrade && activeTrade.timeLeft > 0) {
       const prog = 1 - activeTrade.timeLeft / activeTrade.duration;
-      const tx = XR * 0.6;
+      const tx = XL + CW * 0.75;
       const cr = 16;
       const cy = YT + 30;
 
@@ -598,13 +575,30 @@ const ChartCanvas: React.FC<Props> = ({ candles, livePrice, trades, activeTrade 
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(fmt.countdown(activeTrade.timeLeft), tx, cy);
+
+      // Current price display - green rectangular box to the right of vertical line
+      const priceTag = fmt.price(livePrice);
+      ctx.font = 'bold 9px "SF Mono",ui-monospace,Menlo,monospace';
+      const ptW = ctx.measureText(priceTag).width + 16;
+      const ptH = 20;
+      const ptX = tx + 20;
+      const ptY = lpY - ptH / 2;
+
+      ctx.fillStyle = C.liveGreen;
+      roundRect(ctx, ptX, ptY, ptW, ptH, 4);
+      ctx.fill();
+
+      ctx.fillStyle = "#fff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(priceTag, ptX + ptW / 2, lpY);
     }
 
     /* ═════════════════════════════════════════════════════════════════
        EXPIRY — solid vertical line
        ═════════════════════════════════════════════════════════════════ */
     if (activeTrade && activeTrade.timeLeft > 0) {
-      const ex = XR * 0.82;
+      const ex = XL + CW * 0.85;
       ctx.strokeStyle = C.expireLine;
       ctx.lineWidth = 1.5;
       ctx.globalAlpha = 0.65;
@@ -645,13 +639,13 @@ const ChartCanvas: React.FC<Props> = ({ candles, livePrice, trades, activeTrade 
         ctx.setLineDash([]);
         ctx.font = '9px "SF Mono",ui-monospace,Menlo,monospace';
         const cw = ctx.measureText(cpl).width + 10 | 0;
-        roundRect(ctx, XR + 1, Math.round(cy) - 8, cw, 16, 2);
+        roundRect(ctx, XL - cw - 1, Math.round(cy) - 8, cw, 16, 2);
         ctx.fillStyle = C.crossLabel;
         ctx.fill();
         ctx.fillStyle = "#fff";
-        ctx.textAlign = "left";
+        ctx.textAlign = "right";
         ctx.textBaseline = "middle";
-        ctx.fillText(cpl, XR + 6, cy);
+        ctx.fillText(cpl, XL - 6, cy);
       }
       ctx.setLineDash([]);
 
