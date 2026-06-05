@@ -128,28 +128,22 @@ export default function TradeChart({ trades = [] }: TradeChartProps) {
             if (yPos < 0 || yPos > 200) return null;
 
             const markerColor = trade.type === "UP" ? "#00b58a" : "#f6465d";
+            const glowColor = trade.type === "UP" ? "rgba(0,181,138,0.2)" : "rgba(246,70,93,0.2)";
 
             return (
               <g key={trade.id}>
                 <line
-                  x1="0"
-                  y1={yPos}
-                  x2="400"
-                  y2={yPos}
-                  stroke={markerColor}
-                  strokeWidth="1.5"
-                  strokeDasharray="4,3"
+                  x1="0" y1={yPos} x2="400" y2={yPos}
+                  stroke={glowColor} strokeWidth="6"
                 />
-                <rect
-                  x="10"
-                  y={yPos - 8}
-                  width="70"
-                  height="12"
-                  rx="2"
-                  fill={markerColor}
+                <line
+                  x1="0" y1={yPos} x2="400" y2={yPos}
+                  stroke={markerColor} strokeWidth="2" strokeDasharray="5,4"
                 />
-                <text x="14" y={yPos} dy="1" fill="#fff" fontSize="7" fontWeight="bold">
-                  {trade.type} Buy ₹{trade.amount}
+                <circle cx="8" cy={yPos} r="3" fill={markerColor} />
+                <rect x="16" y={yPos - 9} width="76" height="16" rx="3" fill={markerColor} />
+                <text x="20" y={yPos} dy="1" fill="#0b0c10" fontSize="7" fontWeight="800">
+                  {trade.type} ₹{trade.amount}
                 </text>
               </g>
             );
