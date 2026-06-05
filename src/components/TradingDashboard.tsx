@@ -208,36 +208,18 @@ const TradingDashboard: React.FC<{
       <div className="shrink-0 flex items-center justify-between px-3 py-2" style={{ borderBottom: '1px solid rgba(56,70,90,0.25)' }}>
         <div className="flex items-center gap-2">
           <AccountToggle mode={accountMode} onChange={m => { if (activeTrades.length > 0) return; setAccountMode(m); }} compact />
-          <div className="flex items-center gap-2">
-            {ASSETS.map(a => (
-              <button
-                key={a.id}
-                type="button"
-                onClick={() => setAsset(a)}
-                className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold transition-all"
-                style={asset.id === a.id
-                  ? { background: `${asset.color}25`, color: asset.color, border: `1px solid ${asset.color}50` }
-                  : { background: 'rgba(56,70,90,0.3)', color: '#64748b' }
-                }
-              >
-                <span className="text-xs">{a.icon}</span>
-                <span>{a.id}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className={`text-[11px] font-black tabular-nums px-2.5 py-1 rounded-md ${isDemo ? 'text-amber-400' : 'text-white'}`} style={{ background: 'rgba(10,14,23,0.85)', border: '1px solid rgba(56,70,90,0.3)' }}>
-            ₹{balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          <span className={`text-[13px] font-black tabular-nums px-3 py-1.5 rounded-md ${isDemo ? 'text-amber-400' : 'text-white'}`} style={{ background: 'rgba(10,14,23,0.85)', border: '1px solid rgba(56,70,90,0.3)' }}>
+            <span className="text-[10px] text-slate-500 mr-1">₹</span>
+            {balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
-          <div className="text-right">
-            <span className="text-sm font-black tabular-nums" style={{ color: isPriceUp ? C.up : C.down }}>
-              {price >= 1000 ? price.toFixed(0) : price.toFixed(2)}
-            </span>
-            <span className="text-[9px] font-bold tabular-nums ml-1" style={{ color: isPriceUp ? C.up : C.down }}>
-              {isPriceUp ? '+' : ''}{priceChangePct.toFixed(2)}%
-            </span>
-          </div>
+        </div>
+        <div className="text-right">
+          <span className="text-sm font-black tabular-nums" style={{ color: isPriceUp ? C.up : C.down }}>
+            {price >= 1000 ? price.toFixed(0) : price.toFixed(2)}
+          </span>
+          <span className="text-[9px] font-bold tabular-nums ml-1" style={{ color: isPriceUp ? C.up : C.down }}>
+            {isPriceUp ? '+' : ''}{priceChangePct.toFixed(2)}%
+          </span>
         </div>
       </div>
 
