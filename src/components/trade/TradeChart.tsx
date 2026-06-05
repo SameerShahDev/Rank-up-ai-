@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
-import { createChart, CandlestickSeries, type ISeriesApi } from "lightweight-charts";
+import { createChart, CandlestickSeries, type ISeriesApi, type IPriceLine } from "lightweight-charts";
 
 interface ActiveTrade {
   id: string;
@@ -112,6 +112,27 @@ const TradeChart: React.FC<TradeChartProps> = ({ activeTrade = null, livePrice =
       chart.remove();
     };
   }, []);
+
+  const entryLineRef = useRef<IPriceLine | null>(null);
+
+  useEffect(() => {
+    const cs = candlestickSeriesRef.current;
+    if (!cs) return;
+    if (entryLineRef.current) {
+      cs.removePriceLine(entryLineRef.current);
+      entryLineRef.current = null;
+    }
+    if (activeTrade) {
+      entryLineRef.current = cs.createPriceLine({
+        price: activeTrade.entryPrice,
+        color: activeTrade.type === "UP" ? "#10B981" : "#F43F5E",
+        lineWidth: 1,
+        lineStyle: 2,
+        axisLabelVisible: true,
+        title: `${activeTrade.type === "UP" ? "↑" : "↓"} ${activeTrade.type}`,
+      });
+    }
+  }, [activeTrade]);
 
   const isWinning = activeTrade
     ? activeTrade.type === "UP"
