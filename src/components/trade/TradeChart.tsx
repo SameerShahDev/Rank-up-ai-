@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
-import { createChart, CandlestickSeries, type ISeriesApi, type IPriceLine } from "lightweight-charts";
+import { createChart, CandlestickSeries, type ISeriesApi } from "lightweight-charts";
 
 interface ActiveTrade {
   id: string;
@@ -20,13 +20,10 @@ interface TradeChartProps {
 }
 
 const YIELD = 0.83;
-const UP = "#10B981";
-const DOWN = "#F43F5E";
 
-const TradeChart: React.FC<TradeChartProps> = ({ trades = [], activeTrade = null, livePrice = 0 }) => {
+const TradeChart: React.FC<TradeChartProps> = ({ activeTrade = null, livePrice = 0 }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
-  const priceLinesRef = useRef<Map<string, IPriceLine>>(new Map());
   const lastCandleRef = useRef<any>(null);
 
   useEffect(() => {
@@ -117,33 +114,6 @@ const TradeChart: React.FC<TradeChartProps> = ({ trades = [], activeTrade = null
       chart.remove();
     };
   }, []);
-
-  useEffect(() => {
-    const cs = candlestickSeriesRef.current;
-    if (!cs) return;
-    const lines = priceLinesRef.current;
-    const activeIds = new Set(trades.map(t => t.id));
-
-    for (const [id, line] of lines) {
-      if (!activeIds.has(id)) {
-        cs.removePriceLine(line);
-        lines.delete(id);
-      }
-    }
-
-    for (const t of trades) {
-      if (lines.has(t.id)) continue;
-      const line = cs.createPriceLine({
-        price: t.entryPrice,
-        color: t.type === "UP" ? UP : DOWN,
-        lineWidth: 2,
-        lineStyle: 2,
-        axisLabelVisible: true,
-        title: `${t.type} ₹${t.amount} ${t.timeLeft}s`,
-      });
-      lines.set(t.id, line);
-    }
-  }, [trades]);
 
   const isWinning = activeTrade
     ? activeTrade.type === "UP"

@@ -34,6 +34,7 @@ interface ActiveTrade {
   amount: number;
   duration: number;
   timeLeft: number;
+  placedInMode: 'demo' | 'real';
 }
 
 const SYMBOL_MAP: Record<string, string> = {
@@ -89,6 +90,7 @@ const TradingDashboard: React.FC<{
   addTransaction: (tx: Record<string, string>) => void;
 }> = ({
   accountMode, setAccountMode, balance, setBalance, realBalance,
+  setDemoBalance, setRealBalance,
   addTransaction,
 }) => {
   const isDemo = accountMode === 'demo';
@@ -153,8 +155,9 @@ const TradingDashboard: React.FC<{
         isWin = Math.random() < 0.3;
       }
       const payout = Math.floor(trade.amount * (1 + asset.yield / 100));
+      const settleBalance = trade.placedInMode === 'demo' ? setDemoBalance : setRealBalance;
       if (isWin) {
-        setBalance(prev => prev + payout);
+        settleBalance(prev => prev + payout);
         window.navigator.vibrate?.([50, 150, 50]);
       } else {
         window.navigator.vibrate?.(100);
@@ -167,7 +170,7 @@ const TradingDashboard: React.FC<{
         usd: isWin ? `+₹${(payout - trade.amount).toLocaleString('en-IN')}` : `-₹${trade.amount.toLocaleString('en-IN')}`,
         price: `₹${trade.entryPrice.toFixed(2)}`,
         fee: '₹0',
-        account: accountMode,
+        account: trade.placedInMode,
       });
       setResult({ win: isWin, amt: isWin ? payout - trade.amount : -trade.amount });
       setTimeout(() => setResult(null), 3500);
@@ -178,7 +181,8 @@ const TradingDashboard: React.FC<{
   const handleTrade = (type: 'UP' | 'DOWN') => {
     if (balance < amount || amount < 1) return;
     window.navigator.vibrate?.([15, 30, 15]);
-    setBalance(prev => prev - amount);
+    const deductBalance = accountMode === 'demo' ? setDemoBalance : setRealBalance;
+    deductBalance(prev => prev - amount);
     setActiveTrades(prev => [...prev, {
       id: Math.random().toString(36).slice(2, 11),
       type,
@@ -186,6 +190,7 @@ const TradingDashboard: React.FC<{
       amount,
       duration,
       timeLeft: duration,
+      placedInMode: accountMode,
     }]);
   };
 

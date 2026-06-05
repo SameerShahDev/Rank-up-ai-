@@ -49,6 +49,8 @@ function AppShell() {
     realBalance,
     activeBalance,
     setActiveBalance,
+    setDemoBalance,
+    setRealBalance,
     addTransactionDb,
     depositReal,
     withdrawReal,
@@ -195,6 +197,8 @@ function AppShell() {
             balance={activeBalance}
             setBalance={setActiveBalance}
             realBalance={realBalance}
+            setDemoBalance={setDemoBalance}
+            setRealBalance={setRealBalance}
             addTransaction={addTransaction}
           />
         );
