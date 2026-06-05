@@ -58,9 +58,14 @@ export const Section = ({ title, children }: { title: string; children: React.Re
   </section>
 );
 
-export const StatCard = ({ label, value, accent }: { label: string; value: string; accent?: string }) => (
-  <D className="bg-[#14161f] border border-white/[0.04] rounded-xl p-3 text-center transition-colors hover:border-white/[0.08]">
-    <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest">{label}</p>
-    <p className={`text-sm font-black mt-1.5 leading-none ${accent ?? 'text-white'}`}>{value}</p>
+export const StatCard = ({ label, value, accent, active }: { label: string; value: string; accent?: string; active?: boolean }) => (
+  <D className={`bg-[#14161f] border rounded-xl p-3 text-center transition-all hover:border-white/[0.08] ${
+    active ? 'border-white/15 shadow-[0_0_12px_rgba(255,255,255,0.04)]' : 'border-white/[0.04]'
+  }`}>
+    <div className="flex items-center justify-center gap-1.5 mb-1.5">
+      {active && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.5)]" />}
+      <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest">{label}</p>
+    </div>
+    <p className={`text-sm font-black leading-none ${accent ?? 'text-white'}`}>{value}</p>
   </D>
 );
