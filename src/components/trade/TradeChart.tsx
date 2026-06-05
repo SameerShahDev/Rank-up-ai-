@@ -55,15 +55,18 @@ const TradeChart: React.FC<TradeChartProps> = ({ activeTrade = null, livePrice =
 
     candlestickSeriesRef.current = cs;
 
+    let count = 60;
+    let endTime = Math.floor(Date.now() / 1000);
     const mockData = [];
     let basePrice = 68000;
-    for (let i = 30; i > 0; i--) {
-      const time = Math.floor(Date.now() / 1000) - i;
+
+    for (let i = count; i > 0; i--) {
+      const time = endTime - i * 60;
       const open = basePrice + (Math.random() - 0.5) * 50;
-      const close = open + (Math.random() - 0.5) * 40;
-      const high = Math.max(open, close) + Math.random() * 10;
-      const low = Math.min(open, close) - Math.random() * 10;
-      mockData.push({ time, open, high, low, close: Number(close.toFixed(2)) });
+      const high = open + Math.random() * 40;
+      const low = open - Math.random() * 40;
+      const close = (high + low) / 2;
+      mockData.push({ time, open, high, low, close });
       basePrice = close;
     }
     cs.setData(mockData);
@@ -71,13 +74,27 @@ const TradeChart: React.FC<TradeChartProps> = ({ activeTrade = null, livePrice =
     lastCandleRef.current = mockData[mockData.length - 1];
 
     const interval = setInterval(() => {
+      const currentTime = Math.floor(Date.now() / 1000);
+      const roundedTime = currentTime - (currentTime % 60);
       const lc = lastCandleRef.current;
-      const priceChange = (Math.random() - 0.5) * 15;
-      const close = Number((lc.close + priceChange).toFixed(2));
-      const time = Math.floor(Date.now() / 1000);
-      lastCandleRef.current = { time, open: lc.close, high: close, low: close, close };
+
+      if (roundedTime > lc.time) {
+        lastCandleRef.current = {
+          time: roundedTime,
+          open: lc.close,
+          high: lc.close,
+          low: lc.close,
+          close: lc.close,
+        };
+      } else {
+        const priceChange = (Math.random() - 0.5) * 15;
+        lc.close = Number((lc.close + priceChange).toFixed(2));
+        if (lc.close > lc.high) lc.high = lc.close;
+        if (lc.close < lc.low) lc.low = lc.close;
+      }
+
       cs.update(lastCandleRef.current);
-    }, 100);
+    }, 300);
 
     const handleResize = () => {
       if (chartContainerRef.current) {
