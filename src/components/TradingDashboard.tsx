@@ -202,7 +202,7 @@ const TradingDashboard: React.FC<{
       {/* ── Compact Header ─────────────────────────────────────────── */}
       <div className="shrink-0 flex items-center justify-between px-3 py-2" style={{ borderBottom: '1px solid rgba(56,70,90,0.25)' }}>
         <div className="flex items-center gap-2">
-          <AccountToggle mode={accountMode} onChange={setAccountMode} compact />
+          <AccountToggle mode={accountMode} onChange={m => { if (activeTrades.length > 0) return; setAccountMode(m); }} compact />
           <div className="flex items-center gap-2">
             {ASSETS.map(a => (
               <button
