@@ -169,6 +169,9 @@ const TradingDashboard: React.FC<{
         price: `₹${trade.entryPrice.toFixed(2)}`,
         fee: '₹0',
         account: trade.placedInMode,
+        status: 'completed',
+        date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+        time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }),
       });
     });
     setActiveTrades(prev => prev.filter(t => t.timeLeft > 0));
