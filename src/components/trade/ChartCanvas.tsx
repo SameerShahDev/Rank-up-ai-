@@ -108,7 +108,7 @@ function gridStep(range: number, target: number): number {
 const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 const fmt = {
-  price(v: number) { return v.toFixed(8); },
+  price(v: number) { return v.toFixed(10); },
   axis(v: number) {
     if (v >= 1e6) return (v / 1e6).toFixed(2) + "M";
     if (v >= 1e3) return (v / 1e3).toFixed(1) + "K";
@@ -472,6 +472,23 @@ const ChartCanvas: React.FC<Props> = ({ candles, livePrice, trades, activeTrade 
     ctx.setLineDash([]);
     ctx.globalAlpha = 1;
 
+    // Current price display - green rectangular box at far right
+    const priceTag = fmt.price(livePrice);
+    ctx.font = 'bold 9px "SF Mono",ui-monospace,Menlo,monospace';
+    const ptW = ctx.measureText(priceTag).width + 16;
+    const ptH = 20;
+    const ptX = XR - ptW - 4;
+    const ptY = lpY - ptH / 2;
+
+    ctx.fillStyle = C.liveGreen;
+    roundRect(ctx, ptX, ptY, ptW, ptH, 4);
+    ctx.fill();
+
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(priceTag, ptX + ptW / 2, lpY);
+
     /* ═════════════════════════════════════════════════════════════════
        ENTRY LINES — dotted green + yellow ₹ tag
        ═════════════════════════════════════════════════════════════════ */
@@ -522,7 +539,7 @@ const ChartCanvas: React.FC<Props> = ({ candles, livePrice, trades, activeTrade 
        ═════════════════════════════════════════════════════════════════ */
     if (activeTrade && activeTrade.timeLeft > 0) {
       const prog = 1 - activeTrade.timeLeft / activeTrade.duration;
-      const tx = XL + CW * 0.75;
+      const tx = XL + CW * 0.82;
       const cr = 16;
       const cy = YT + 30;
 
@@ -575,23 +592,6 @@ const ChartCanvas: React.FC<Props> = ({ candles, livePrice, trades, activeTrade 
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(fmt.countdown(activeTrade.timeLeft), tx, cy);
-
-      // Current price display - green rectangular box to the right of vertical line
-      const priceTag = fmt.price(livePrice);
-      ctx.font = 'bold 9px "SF Mono",ui-monospace,Menlo,monospace';
-      const ptW = ctx.measureText(priceTag).width + 16;
-      const ptH = 20;
-      const ptX = tx + 20;
-      const ptY = lpY - ptH / 2;
-
-      ctx.fillStyle = C.liveGreen;
-      roundRect(ctx, ptX, ptY, ptW, ptH, 4);
-      ctx.fill();
-
-      ctx.fillStyle = "#fff";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(priceTag, ptX + ptW / 2, lpY);
     }
 
     /* ═════════════════════════════════════════════════════════════════
