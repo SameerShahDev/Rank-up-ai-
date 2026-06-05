@@ -1,24 +1,8 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import { createChart, ColorType, CrosshairMode, type IChartApi, type CandlestickData, type UTCTimestamp } from "lightweight-charts";
 import type { Candle } from "../../utils/marketData";
-
-interface Trade {
-  id: string;
-  type: "UP" | "DOWN";
-  entryPrice: number;
-  amount: number;
-  duration: number;
-  timeLeft: number;
-}
-
-interface Props {
-  candles: Candle[];
-  livePrice: number;
-  trades: Trade[];
-  activeTrade: Trade | null;
-}
 
 const CHART_BG = "#1C1E22";
 const TEXT_COLOR = "rgba(140, 156, 178, 0.7)";
@@ -35,69 +19,73 @@ function formatPrice(price: number): string {
   return price.toFixed(4);
 }
 
-const TradeChart: React.FC<Props> = ({ candles, livePrice, trades, activeTrade }) => {
+const TradeChart: React.FC<{
+  candles: Candle[];
+  livePrice: number;
+  trades?: unknown[];
+  activeTrade?: unknown;
+}> = ({ candles, livePrice }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ReturnType<IChartApi["addCandlestickSeries"]> | null>(null);
-
-  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const chart = createChart(container, {
-      autoSize: true,
-      layout: {
-        background: { type: ColorType.Solid, color: CHART_BG },
-        textColor: TEXT_COLOR,
-      },
-      grid: {
-        vertLines: { color: GRID_COLOR, style: 1, visible: false },
-        horzLines: { color: GRID_COLOR, style: 1 },
-      },
-      crosshair: {
-        mode: CrosshairMode.Normal,
-        vertLine: { color: "rgba(140, 156, 178, 0.35)", width: 1, style: 2, labelBackgroundColor: CHART_BG },
-        horzLine: { color: "rgba(140, 156, 178, 0.35)", width: 1, style: 2, labelBackgroundColor: CHART_BG },
-      },
-      rightPriceScale: {
-        borderColor: GRID_COLOR,
-        scaleMargins: { top: 0.1, bottom: 0.1 },
-        entireTextOnly: true,
-      },
-      timeScale: {
-        borderColor: GRID_COLOR,
-        timeVisible: true,
-        secondsVisible: false,
-        barSpacing: 10,
-        minBarSpacing: 8,
-        fixLeftEdge: true,
-        fixRightEdge: true,
-      },
-      handleScroll: { vertTouchDrag: false },
-      handleScale: { axisDoubleClickReset: true },
-    });
+    try {
+      const chart = createChart(container, {
+        autoSize: true,
+        layout: {
+          background: { type: ColorType.Solid, color: CHART_BG },
+          textColor: TEXT_COLOR,
+        },
+        grid: {
+          vertLines: { color: GRID_COLOR, visible: false },
+          horzLines: { color: GRID_COLOR },
+        },
+        crosshair: {
+          mode: CrosshairMode.Normal,
+          vertLine: { color: "rgba(140, 156, 178, 0.35)", width: 1, style: 2, labelBackgroundColor: CHART_BG },
+          horzLine: { color: "rgba(140, 156, 178, 0.35)", width: 1, style: 2, labelBackgroundColor: CHART_BG },
+        },
+        rightPriceScale: {
+          borderColor: GRID_COLOR,
+          scaleMargins: { top: 0.1, bottom: 0.1 },
+          entireTextOnly: true,
+        },
+        timeScale: {
+          borderColor: GRID_COLOR,
+          timeVisible: true,
+          secondsVisible: false,
+          barSpacing: 10,
+          minBarSpacing: 8,
+          fixLeftEdge: true,
+          fixRightEdge: true,
+        },
+        handleScroll: false,
+        handleScale: false,
+      });
 
-    const series = chart.addCandlestickSeries({
-      upColor: UP_COLOR,
-      downColor: DOWN_COLOR,
-      borderUpColor: UP_COLOR,
-      borderDownColor: DOWN_COLOR,
-      wickUpColor: UP_COLOR,
-      wickDownColor: DOWN_COLOR,
-      priceFormat: {
-        type: "custom",
-        formatter: (price: number) => formatPrice(price),
-      },
-    });
+      const series = chart.addCandlestickSeries({
+        upColor: UP_COLOR,
+        downColor: DOWN_COLOR,
+        borderUpColor: UP_COLOR,
+        borderDownColor: DOWN_COLOR,
+        wickUpColor: UP_COLOR,
+        wickDownColor: DOWN_COLOR,
+        priceFormat: { type: "custom", formatter: formatPrice },
+      });
 
-    chartRef.current = chart;
-    seriesRef.current = series;
-    setReady(true);
+      chartRef.current = chart;
+      seriesRef.current = series;
+    } catch (e) {
+      console.error("TradeChart init error:", e);
+    }
 
     return () => {
-      chart.remove();
+      const c = chartRef.current;
+      if (c) { c.remove(); }
       chartRef.current = null;
       seriesRef.current = null;
     };
@@ -115,17 +103,17 @@ const TradeChart: React.FC<Props> = ({ candles, livePrice, trades, activeTrade }
       close: c.close,
     }));
 
-    series.setData(chartData);
-    const chart = chartRef.current;
-    if (chart) {
-      chart.timeScale().scrollToRealTime();
+    try {
+      series.setData(chartData);
+      chartRef.current?.timeScale().scrollToRealTime();
+    } catch (e) {
+      console.error("TradeChart data error:", e);
     }
   }, [candles]);
 
   useEffect(() => {
     const series = seriesRef.current;
-    const chart = chartRef.current;
-    if (!series || !chart || !candles.length) return;
+    if (!series || !candles.length) return;
 
     const lastCandle = candles[candles.length - 1];
     const updateData: Partial<CandlestickData> = {
@@ -136,7 +124,11 @@ const TradeChart: React.FC<Props> = ({ candles, livePrice, trades, activeTrade }
     if (livePrice > lastCandle.high) updateData.high = livePrice;
     if (livePrice < lastCandle.low) updateData.low = livePrice;
 
-    series.update(updateData as CandlestickData);
+    try {
+      series.update(updateData as CandlestickData);
+    } catch (e) {
+      console.error("TradeChart update error:", e);
+    }
   }, [livePrice]);
 
   return (
