@@ -195,7 +195,6 @@ function AppShell() {
             setAccountMode={setAccountMode}
             balance={activeBalance}
             setBalance={setActiveBalance}
-            realBalance={realBalance}
             addTransaction={addTransaction}
           />
         );
