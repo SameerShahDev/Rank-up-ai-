@@ -1,22 +1,19 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
-import { createChart, ColorType, CrosshairMode, type IChartApi, type CandlestickData, type UTCTimestamp } from "lightweight-charts";
+import { createChart, ColorType, CrosshairMode, type IChartApi, type CandlestickData, type UTCTimestamp, type HistogramData } from "lightweight-charts";
 import type { Candle } from "../../utils/marketData";
 
-const CHART_BG = "#1C1E22";
-const TEXT_COLOR = "rgba(140, 156, 178, 0.7)";
-const GRID_COLOR = "rgba(38, 41, 46, 0.4)";
-const UP_COLOR = "#00B074";
-const DOWN_COLOR = "#F3505D";
+const CHART_BG = "#212121";
+const TEXT_COLOR = "#EEEEEE";
+const GRID_COLOR = "rgba(129, 139, 166, 0.2)";
+const UP_COLOR = "#2D9CDB";
+const DOWN_COLOR = "#EB5757";
+const CROSSHAIR_COLOR = "rgba(129, 139, 166, 0.35)";
+const CURRENT_LINE_COLOR = "rgba(238, 238, 238, 0.7)";
 
-function formatPrice(price: number): string {
-  if (price >= 1000000) return price.toFixed(0);
-  if (price >= 1000) return price.toFixed(0);
-  if (price >= 100) return price.toFixed(2);
-  if (price >= 10) return price.toFixed(2);
-  if (price >= 1) return price.toFixed(3);
-  return price.toFixed(4);
+function fmtINR(p: number): string {
+  return Math.round(p).toLocaleString("en-IN");
 }
 
 const TradeChart: React.FC<{
@@ -28,6 +25,7 @@ const TradeChart: React.FC<{
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ReturnType<IChartApi["addCandlestickSeries"]> | null>(null);
+  const volSeriesRef = useRef<ReturnType<IChartApi["addHistogramSeries"]> | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -46,20 +44,32 @@ const TradeChart: React.FC<{
         },
         crosshair: {
           mode: CrosshairMode.Normal,
-          vertLine: { color: "rgba(140, 156, 178, 0.35)", width: 1, style: 2, labelBackgroundColor: CHART_BG },
-          horzLine: { color: "rgba(140, 156, 178, 0.35)", width: 1, style: 2, labelBackgroundColor: CHART_BG },
+          vertLine: {
+            color: CROSSHAIR_COLOR,
+            width: 1,
+            style: 2,
+            labelBackgroundColor: "#EEEEEE",
+            labelTextColor: "#212121",
+          },
+          horzLine: {
+            color: CROSSHAIR_COLOR,
+            width: 1,
+            style: 2,
+            labelBackgroundColor: "#EEEEEE",
+            labelTextColor: "#212121",
+          },
         },
         rightPriceScale: {
-          borderColor: GRID_COLOR,
-          scaleMargins: { top: 0.1, bottom: 0.1 },
+          borderVisible: false,
+          scaleMargins: { top: 0.06, bottom: 0.28 },
           entireTextOnly: true,
         },
         timeScale: {
-          borderColor: GRID_COLOR,
+          borderVisible: false,
           timeVisible: true,
-          secondsVisible: false,
+          secondsVisible: true,
           barSpacing: 10,
-          minBarSpacing: 8,
+          minBarSpacing: 6,
           fixLeftEdge: true,
           fixRightEdge: true,
         },
@@ -74,11 +84,21 @@ const TradeChart: React.FC<{
         borderDownColor: DOWN_COLOR,
         wickUpColor: UP_COLOR,
         wickDownColor: DOWN_COLOR,
-        priceFormat: { type: "custom", formatter: formatPrice },
+        priceFormat: { type: "custom", formatter: fmtINR },
+      });
+
+      const volSeries = chart.addHistogramSeries({
+        priceFormat: { type: "volume" },
+        priceScaleId: "",
+      });
+
+      chart.priceScale("").applyOptions({
+        scaleMargins: { top: 0.83, bottom: 0 },
       });
 
       chartRef.current = chart;
       seriesRef.current = series;
+      volSeriesRef.current = volSeries;
     } catch (e) {
       console.error("TradeChart init error:", e);
     }
@@ -88,11 +108,13 @@ const TradeChart: React.FC<{
       if (c) { c.remove(); }
       chartRef.current = null;
       seriesRef.current = null;
+      volSeriesRef.current = null;
     };
   }, []);
 
   useEffect(() => {
     const series = seriesRef.current;
+    const volSeries = volSeriesRef.current;
     if (!series || !candles.length) return;
 
     const chartData: CandlestickData[] = candles.map((c) => ({
@@ -103,8 +125,15 @@ const TradeChart: React.FC<{
       close: c.close,
     }));
 
+    const volData: HistogramData[] = candles.map((c) => ({
+      time: (c.time / 1000) as UTCTimestamp,
+      value: c.volume,
+      color: c.close >= c.open ? "rgba(45,156,219,0.2)" : "rgba(235,87,87,0.2)",
+    }));
+
     try {
       series.setData(chartData);
+      volSeries?.setData(volData);
       chartRef.current?.timeScale().scrollToRealTime();
     } catch (e) {
       console.error("TradeChart data error:", e);
@@ -120,9 +149,17 @@ const TradeChart: React.FC<{
       time: (lastCandle.time / 1000) as UTCTimestamp,
       close: livePrice,
     };
-
     if (livePrice > lastCandle.high) updateData.high = livePrice;
     if (livePrice < lastCandle.low) updateData.low = livePrice;
+
+    const volSeries = volSeriesRef.current;
+    if (volSeries) {
+      volSeries.update({
+        time: (lastCandle.time / 1000) as UTCTimestamp,
+        value: lastCandle.volume,
+        color: livePrice >= lastCandle.open ? "rgba(45,156,219,0.2)" : "rgba(235,87,87,0.2)",
+      });
+    }
 
     try {
       series.update(updateData as CandlestickData);
