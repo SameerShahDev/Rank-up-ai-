@@ -1,15 +1,15 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Mail, Lock, ArrowRight, Loader2, User, Shield, ChevronLeft } from 'lucide-react';
-import { signUpWithEmail, verifyEmailOtp, signInWithEmail, signInWithGoogle } from '../../services/authService';
+import { Mail, Lock, ArrowRight, Loader2, User, Shield, ChevronLeft, KeyRound } from 'lucide-react';
+import { signUpWithEmail, verifyEmailOtp, signInWithEmail, signInWithGoogle, sendLoginOtp, verifyLoginOtp } from '../../services/authService';
 import type { UserProfile } from '../../types/profile';
 
 interface AuthFlowProps {
   onComplete: (profile: UserProfile) => void;
 }
 
-type AuthStep = 'signup' | 'login' | 'otp' | 'name';
+type AuthStep = 'login' | 'signup' | 'otp';
 
 const AuthFlow: React.FC<AuthFlowProps> = ({ onComplete }) => {
   const [step, setStep] = useState<AuthStep>('login');
@@ -19,14 +19,31 @@ const AuthFlow: React.FC<AuthFlowProps> = ({ onComplete }) => {
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [otpForLogin, setOtpForLogin] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const cooldownRef = useRef<ReturnType<typeof setInterval>>();
 
-  // Auto-focus first OTP input
   useEffect(() => {
     if (step === 'otp') {
       otpRefs.current[0]?.focus();
     }
   }, [step]);
+
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      cooldownRef.current = setInterval(() => {
+        setResendCooldown(prev => {
+          if (prev <= 1) {
+            clearInterval(cooldownRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(cooldownRef.current);
+  }, [resendCooldown, step]);
 
   const handleOtpChange = (index: number, value: string) => {
     if (!/^\d*$/.test(value)) return;
@@ -35,12 +52,10 @@ const AuthFlow: React.FC<AuthFlowProps> = ({ onComplete }) => {
     setOtpDigits(newDigits);
     setError('');
 
-    // Auto-advance to next input
     if (value && index < 5) {
       otpRefs.current[index + 1]?.focus();
     }
 
-    // Auto-submit when all 6 digits entered
     if (newDigits.every(d => d !== '') && index === 5) {
       void handleVerifyOtp(newDigits.join(''));
     }
@@ -61,6 +76,11 @@ const AuthFlow: React.FC<AuthFlowProps> = ({ onComplete }) => {
       otpRefs.current[5]?.focus();
       void handleVerifyOtp(pasted);
     }
+  };
+
+  const clearOtp = () => {
+    setOtpDigits(['', '', '', '', '', '']);
+    setError('');
   };
 
   // ─── Sign Up ─────────────────────────────────────────────────────────
@@ -90,12 +110,11 @@ const AuthFlow: React.FC<AuthFlowProps> = ({ onComplete }) => {
     }
 
     if (res.needsOtp) {
-      // OTP sent to email — show OTP screen
+      setOtpForLogin(false);
       setStep('otp');
       return;
     }
 
-    // Auto-confirmed (no OTP needed) — go straight to app
     if (res.profile) {
       onComplete(res.profile);
     }
@@ -128,6 +147,30 @@ const AuthFlow: React.FC<AuthFlowProps> = ({ onComplete }) => {
     }
   };
 
+  // ─── Send Login OTP ──────────────────────────────────────────────────
+  const handleSendLoginOtp = async () => {
+    setError('');
+    if (!email.trim() || !email.includes('@')) {
+      setError('Enter a valid email address');
+      return;
+    }
+
+    setLoading(true);
+    console.log('[Auth] Sending login OTP for:', email);
+    const res = await sendLoginOtp(email.trim());
+    setLoading(false);
+
+    if (!res.success) {
+      setError(res.error ?? 'Failed to send code');
+      return;
+    }
+
+    setOtpForLogin(true);
+    clearOtp();
+    setResendCooldown(30);
+    setStep('otp');
+  };
+
   // ─── Verify OTP ──────────────────────────────────────────────────────
   const handleVerifyOtp = async (otp?: string) => {
     const code = otp ?? otpDigits.join('');
@@ -138,8 +181,10 @@ const AuthFlow: React.FC<AuthFlowProps> = ({ onComplete }) => {
 
     setLoading(true);
     setError('');
-    console.log('[Auth] Verifying OTP');
-    const res = await verifyEmailOtp(email.trim(), code);
+    console.log('[Auth] Verifying OTP for login:', otpForLogin);
+    const res = otpForLogin
+      ? await verifyLoginOtp(email.trim(), code)
+      : await verifyEmailOtp(email.trim(), code);
     setLoading(false);
 
     if (!res.success) {
@@ -150,6 +195,24 @@ const AuthFlow: React.FC<AuthFlowProps> = ({ onComplete }) => {
     if (res.profile) {
       onComplete(res.profile);
     }
+  };
+
+  // ─── Resend OTP ──────────────────────────────────────────────────────
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0) return;
+    setError('');
+    setLoading(true);
+    const res = otpForLogin
+      ? await sendLoginOtp(email.trim())
+      : await signUpWithEmail(email.trim(), password, displayName.trim());
+    setLoading(false);
+
+    if (!res.success) {
+      setError(res.error ?? 'Failed to resend code');
+      return;
+    }
+    clearOtp();
+    setResendCooldown(30);
   };
 
   // ─── Google Login ────────────────────────────────────────────────────
@@ -176,7 +239,7 @@ const AuthFlow: React.FC<AuthFlowProps> = ({ onComplete }) => {
         <div className="relative z-10 w-full max-w-[400px] space-y-6">
           <button
             type="button"
-            onClick={() => { setStep('signup'); setOtpDigits(['', '', '', '', '', '']); setError(''); }}
+            onClick={() => { setStep(otpForLogin ? 'login' : 'signup'); clearOtp(); setError(''); }}
             className="flex items-center gap-1 text-gray-500 text-sm font-bold mb-2"
           >
             <ChevronLeft className="w-4 h-4" />
@@ -189,7 +252,7 @@ const AuthFlow: React.FC<AuthFlowProps> = ({ onComplete }) => {
             </div>
             <h1 className="text-2xl font-black tracking-tight">Verify your email</h1>
             <p className="text-sm text-gray-400">
-              We sent a 6-digit code to<br />
+              {otpForLogin ? 'Enter the code sent to' : 'We sent a 6-digit code to'}<br />
               <span className="text-white font-bold">{email}</span>
             </p>
           </div>
@@ -223,13 +286,22 @@ const AuthFlow: React.FC<AuthFlowProps> = ({ onComplete }) => {
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Verify <ArrowRight className="w-5 h-5" /></>}
           </button>
 
-          <button
-            type="button"
-            onClick={() => { setOtpDigits(['', '', '', '', '', '']); setError(''); void handleSignUp(); }}
-            className="w-full text-sm text-gray-500 py-2"
-          >
-            Resend code
-          </button>
+          <div className="text-center">
+            {resendCooldown > 0 ? (
+              <p className="text-sm text-gray-500">
+                Resend code in <span className="text-white font-bold tabular-nums">{resendCooldown}s</span>
+              </p>
+            ) : (
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => void handleResendOtp()}
+                className="text-sm text-blue-400 font-bold hover:text-blue-300 transition-colors"
+              >
+                Resend code
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -292,6 +364,17 @@ const AuthFlow: React.FC<AuthFlowProps> = ({ onComplete }) => {
               <span className="text-[10px] font-bold text-gray-500 uppercase">or</span>
               <div className="flex-1 h-px bg-white/10" />
             </div>
+
+            {/* Login with OTP */}
+            <button
+              type="button"
+              disabled={!email.trim() || loading}
+              onClick={() => void handleSendLoginOtp()}
+              className="w-full py-3.5 bg-[#161821] border border-white/10 rounded-xl font-black text-sm flex items-center justify-center gap-2 disabled:opacity-40 hover:bg-[#1a1d2e] transition-colors"
+            >
+              <KeyRound className="w-4 h-4 text-blue-400" />
+              Send OTP to email
+            </button>
 
             {/* Google Login */}
             <button
