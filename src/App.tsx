@@ -94,7 +94,6 @@ function AppShell() {
 
   const addTransaction = (tx: Record<string, string>) => {
     setTransactions(prev => [tx, ...prev]);
-    addTransactionDb(tx);
   };
 
   const handleDeposit = async (amount: number, meta?: { orderId: string; utr?: string }) => {

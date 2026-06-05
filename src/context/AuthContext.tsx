@@ -6,7 +6,6 @@ import React, {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type Dispatch,
   type SetStateAction,
@@ -74,7 +73,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userSettings, setUserSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
   const [accountStats, setAccountStats] = useState<AccountStats | null>(null);
   const [settingsLoading, setSettingsLoading] = useState(false);
-  const syncTimer = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     localStorage.setItem(MODE_KEY, accountMode);
@@ -206,21 +204,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => { cancelled = true; };
   }, [profile?.profileId]);
 
-  // ─── Auto-sync balances ──────────────────────────────────────────────
+  // ─── Persist balances (manual call only — no auto-debounce) ───────────
   const persistBalances = useCallback(async () => {
     if (!profile) return;
     await syncBalances(demoBalance, realBalance);
     setProfile(prev => prev ? { ...prev, demoBalance, realBalance } : prev);
   }, [profile, demoBalance, realBalance]);
-
-  useEffect(() => {
-    if (!profile) return;
-    clearTimeout(syncTimer.current);
-    syncTimer.current = setTimeout(() => {
-      persistBalances();
-    }, 800);
-    return () => clearTimeout(syncTimer.current);
-  }, [demoBalance, realBalance, profile, persistBalances]);
 
   const completeLogin = useCallback((p: UserProfile) => {
     setProfile(p);
