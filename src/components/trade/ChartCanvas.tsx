@@ -263,9 +263,12 @@ const ChartCanvas: React.FC<Props> = ({ candles, livePrice, trades, activeTrade 
     lo -= rangeP * 0.05;
     const PR = hi - lo;
 
-    /* ── Candle Geometry (6-8px width, 3-4px gap) ─────────────────── */
-    const CANDLE_WIDTH = Math.max(6, Math.min(8, CW / vN - 4));
+    /* ── Candle Geometry (6-8px width, fixed 4px gap, no overlap) ─── */
     const CANDLE_GAP = 4;
+    const MAX_CANDLE_WIDTH = 8;
+    const MIN_CANDLE_WIDTH = 6;
+    const availableSpace = CW - (vN - 1) * CANDLE_GAP;
+    const CANDLE_WIDTH = Math.max(MIN_CANDLE_WIDTH, Math.min(MAX_CANDLE_WIDTH, availableSpace / vN));
     const TOTAL_CANDLE_WIDTH = CANDLE_WIDTH + CANDLE_GAP;
     
     const xAt = (i: number) => XL + 10 + i * TOTAL_CANDLE_WIDTH;
@@ -412,6 +415,12 @@ const ChartCanvas: React.FC<Props> = ({ candles, livePrice, trades, activeTrade 
   }, [candles, livePrice, trades, hover, range]);
 
   useEffect(() => { draw(); }, [draw]);
+  
+  // Force re-render when visible range changes
+  useEffect(() => {
+    draw();
+  }, [range]);
+  
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
