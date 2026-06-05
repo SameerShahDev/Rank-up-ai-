@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import ChartCanvas from "./trade/ChartCanvas";
+import TradeChart from "./trade/TradeChart";
 import { getLiveCandles, getLivePrice, tickPrices, type Candle } from "../utils/marketData";
 
 /* ─── Trade type ─────────────────────────────────────────────────────────── */
@@ -66,7 +66,7 @@ const TradingChartDemo: React.FC = () => {
 
   return (
     <div className="w-full h-full bg-[#111119]">
-      <ChartCanvas candles={candles} livePrice={livePrice} trades={trades} activeTrade={activeTrade} />
+      <TradeChart candles={candles} livePrice={livePrice} trades={trades} activeTrade={activeTrade} />
     </div>
   );
 };

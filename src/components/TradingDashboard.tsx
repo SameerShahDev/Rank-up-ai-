@@ -10,7 +10,7 @@ import type { AccountMode } from '../types/account';
 import AccountToggle from './AccountToggle';
 import type { Candle } from '../utils/marketData';
 import { getLiveCandles, getLivePrice, tickPrices } from '../utils/marketData';
-import ChartCanvas from './trade/ChartCanvas';
+import TradeChart from './trade/TradeChart';
 
 interface Asset {
   id: string;
@@ -238,7 +238,7 @@ const TradingDashboard: React.FC<{
 
       {/* ── Chart ────────────────────────────────────────────────── */}
       <div className="flex-1 min-h-0 relative" style={{ background: '#111119' }}>
-        <ChartCanvas 
+        <TradeChart 
           candles={candles} 
           livePrice={price} 
           trades={activeTrades.map(t => ({
@@ -260,6 +260,29 @@ const TradingDashboard: React.FC<{
         />
       </div>
 
+      {/* ── Sub-Chart Metrics Panel (OHLC) ─────────────────────── */}
+      {candles.length > 0 && (
+        <div className="shrink-0 flex items-center gap-3 px-3 py-1.5" style={{
+          background: '#0a0e17',
+          borderTop: '1px solid rgba(56,70,90,0.15)',
+          borderBottom: '1px solid rgba(56,70,90,0.15)',
+        }}>
+          {[
+            { label: 'OPEN', value: candles[candles.length - 1].open.toFixed(price >= 1000 ? 0 : 2) },
+            { label: 'HIGH', value: candles[candles.length - 1].high.toFixed(price >= 1000 ? 0 : 2), up: true },
+            { label: 'LOW', value: candles[candles.length - 1].low.toFixed(price >= 1000 ? 0 : 2), up: false },
+            { label: 'VOL', value: (candles[candles.length - 1].volume ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 0 }) },
+          ].map((m, i) => (
+            <div key={m.label} className="flex items-center gap-1">
+              <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: 'rgba(140,156,178,0.5)' }}>{m.label}</span>
+              <span className={`text-[10px] font-bold tabular-nums ${m.up === true ? 'text-emerald-400' : m.up === false ? 'text-rose-400' : 'text-slate-300'}`}>
+                {m.value}
+              </span>
+              {i < 3 && <span className="text-[8px]" style={{ color: 'rgba(140,156,178,0.2)' }}>|</span>}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── Bottom Controls ─────────────────────────────────────── */}
       <div className="shrink-0 px-3 py-2 pb-[max(8px,env(safe-area-inset-bottom))]" style={{ background: '#0a0e17', borderTop: '1px solid rgba(56,70,90,0.25)' }}>
@@ -310,8 +333,8 @@ const TradingDashboard: React.FC<{
             </div>
             
             {/* Duration */}
-            <div className="grid grid-cols-3 gap-1">
-              {[3, 5, 10].map(d => (
+            <div className="grid grid-cols-5 gap-1">
+              {[3, 5, 10, 30, 60].map(d => (
                 <button
                   key={d}
                   type="button"
