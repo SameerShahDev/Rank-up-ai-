@@ -2,7 +2,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Mail, Lock, ArrowRight, Loader2, User, Shield, ChevronLeft, KeyRound } from 'lucide-react';
-import { signUpWithEmail, verifyEmailOtp, signInWithEmail, signInWithGoogle, sendLoginOtp, verifyLoginOtp } from '../../services/authService';
+import { signUpWithEmail, verifyEmailOtp, signInWithEmail, signInWithGoogle } from '../../services/authService';
+import { sendOtp as resendOtp, verifyOtp as resendVerifyOtp } from '../../services/otpService';
 import type { UserProfile } from '../../types/profile';
 
 interface AuthFlowProps {
@@ -157,7 +158,7 @@ const AuthFlow: React.FC<AuthFlowProps> = ({ onComplete }) => {
 
     setLoading(true);
     console.log('[Auth] Sending login OTP for:', email);
-    const res = await sendLoginOtp(email.trim());
+    const res = await resendOtp(email.trim());
     setLoading(false);
 
     if (!res.success) {
@@ -183,7 +184,7 @@ const AuthFlow: React.FC<AuthFlowProps> = ({ onComplete }) => {
     setError('');
     console.log('[Auth] Verifying OTP for login:', otpForLogin);
     const res = otpForLogin
-      ? await verifyLoginOtp(email.trim(), code)
+      ? await resendVerifyOtp(email.trim(), code)
       : await verifyEmailOtp(email.trim(), code);
     setLoading(false);
 
@@ -203,7 +204,7 @@ const AuthFlow: React.FC<AuthFlowProps> = ({ onComplete }) => {
     setError('');
     setLoading(true);
     const res = otpForLogin
-      ? await sendLoginOtp(email.trim())
+      ? await resendOtp(email.trim())
       : await signUpWithEmail(email.trim(), password, displayName.trim());
     setLoading(false);
 
