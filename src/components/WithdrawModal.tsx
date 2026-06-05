@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { X, Check, ArrowUpRight, AlertCircle, Clock, Shield, Info } from 'lucide-react';
-import { WITHDRAWAL_LIMIT } from '../types/account';
+import { WITHDRAWAL_LIMIT, WITHDRAWAL_MIN } from '../types/account';
 
 interface WithdrawModalProps {
   balance: number;
@@ -22,6 +22,10 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ balance, accountMode = 'r
   const validate = (): boolean => {
     if (!num || num <= 0) {
       setError('Enter a valid amount');
+      return false;
+    }
+    if (num < WITHDRAWAL_MIN) {
+      setError(`Minimum withdrawal is ₹${WITHDRAWAL_MIN.toLocaleString('en-IN')}`);
       return false;
     }
     if (num > balance) {
@@ -70,8 +74,8 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ balance, accountMode = 'r
                 </p>
                 <p className="text-[11px] text-gray-300 font-bold leading-relaxed">
                   {accountMode === 'demo'
-                    ? 'This is a simulated withdrawal. No real money is transferred. Max ₹1,000 per request.'
-                    : `Withdrawals are processed within 1–3 business days. Max ₹${WITHDRAWAL_LIMIT.toLocaleString('en-IN')} per request.`
+                    ? 'This is a simulated withdrawal. No real money is transferred.'
+                    : `Withdrawals are processed within 1–3 business days. Min ₹${WITHDRAWAL_MIN.toLocaleString('en-IN')} – Max ₹${WITHDRAWAL_LIMIT.toLocaleString('en-IN')} per request.`
                   }
                 </p>
               </div>
@@ -101,7 +105,7 @@ const WithdrawModal: React.FC<WithdrawModalProps> = ({ balance, accountMode = 'r
 
             {/* Quick Amount Buttons */}
             <div className="grid grid-cols-4 gap-2">
-              {[200, 500, 1000, 2000].filter(v => v <= maxAllowed).map(v => (
+              {[1000, 5000, 25000, 50000].filter(v => v <= maxAllowed).map(v => (
                 <button
                   key={v}
                   type="button"
