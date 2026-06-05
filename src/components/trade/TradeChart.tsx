@@ -19,7 +19,7 @@ interface TradeChartProps {
   activeTrade?: ActiveTrade | null;
 }
 
-const TradeChart: React.FC<TradeChartProps> = ({ activeTrade = null, livePrice = 0 }) => {
+const TradeChart: React.FC<TradeChartProps> = ({ trades = [], activeTrade = null, livePrice = 0 }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const lastCandleRef = useRef<any>(null);
@@ -113,26 +113,34 @@ const TradeChart: React.FC<TradeChartProps> = ({ activeTrade = null, livePrice =
     };
   }, []);
 
-  const entryLineRef = useRef<IPriceLine | null>(null);
+  const tradeLinesRef = useRef<Map<string, IPriceLine>>(new Map());
 
   useEffect(() => {
     const cs = candlestickSeriesRef.current;
     if (!cs) return;
-    if (entryLineRef.current) {
-      cs.removePriceLine(entryLineRef.current);
-      entryLineRef.current = null;
+    const lines = tradeLinesRef.current;
+    const activeIds = new Set(trades.map(t => t.id));
+
+    for (const [id, line] of lines) {
+      if (!activeIds.has(id)) {
+        cs.removePriceLine(line);
+        lines.delete(id);
+      }
     }
-    if (activeTrade) {
-      entryLineRef.current = cs.createPriceLine({
-        price: activeTrade.entryPrice,
-        color: activeTrade.type === "UP" ? "#10B981" : "#F43F5E",
+
+    for (const t of trades) {
+      if (lines.has(t.id)) continue;
+      const line = cs.createPriceLine({
+        price: t.entryPrice,
+        color: t.type === "UP" ? "#10B981" : "#F43F5E",
         lineWidth: 1,
         lineStyle: 2,
         axisLabelVisible: true,
-        title: `${activeTrade.type === "UP" ? "↑" : "↓"} ${activeTrade.type}`,
+        title: `${t.type === "UP" ? "↑" : "↓"} ${t.type} ₹${t.amount}`,
       });
+      lines.set(t.id, line);
     }
-  }, [activeTrade]);
+  }, [trades]);
 
   const isWinning = activeTrade
     ? activeTrade.type === "UP"
