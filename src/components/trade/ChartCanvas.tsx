@@ -69,7 +69,7 @@ const ChartCanvas: React.FC<Props> = ({ candles, livePrice, trades, activeTrade 
     if (!candles.length) return;
     setRange(prev => {
       if (prev.s === 0 && prev.e === 0) {
-        const n = Math.min(60, candles.length);
+        const n = Math.min(40, candles.length);
         return { s: candles.length - n, e: candles.length - 1 };
       }
       if (prev.e >= candles.length - 2) {
@@ -94,7 +94,7 @@ const ChartCanvas: React.FC<Props> = ({ candles, livePrice, trades, activeTrade 
           const mouseX = e.clientX - rect.left;
           const ratio = Math.min(1, Math.max(0, mouseX / rect.width));
           const delta = e.deltaY > 0 ? 3 : -3;
-          const nn = Math.max(10, Math.min(candles.length, n + delta));
+          const nn = Math.max(35, Math.min(candles.length, n + delta));
           const shrink = n - nn;
           const sOff = Math.round(shrink * ratio);
           return {
@@ -177,7 +177,7 @@ const ChartCanvas: React.FC<Props> = ({ candles, livePrice, trades, activeTrade 
     if (pinch.current.on && e.touches.length === 2) {
       const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
       const scale = pinch.current.d0 / d;
-      const nn = Math.max(10, Math.min(candles.length, Math.round(pinch.current.n0 * scale)));
+      const nn = Math.max(35, Math.min(candles.length, Math.round(pinch.current.n0 * scale)));
       const mid = (range.s + range.e) / 2;
       const half = nn / 2;
       setRange({ s: Math.max(0, Math.min(candles.length - nn, Math.round(mid - half))), e: Math.max(0, Math.min(candles.length - 1, Math.round(mid + half))) });
@@ -232,8 +232,9 @@ const ChartCanvas: React.FC<Props> = ({ candles, livePrice, trades, activeTrade 
     ctx.scale(dpr, dpr);
 
     const AXIS_W = 70;
+    const PAD = 40;
     const XL = 0, XR = W - AXIS_W, CW = XR - XL;
-    const YT = 0, YB = H, CH = YB - YT;
+    const YT = PAD, YB = H - PAD, CH = YB - YT;
 
     if (candles.length < 2) return;
 
@@ -265,8 +266,8 @@ const ChartCanvas: React.FC<Props> = ({ candles, livePrice, trades, activeTrade 
 
     /* ── Candle Geometry (6-8px width, fixed 4px gap, no overlap) ─── */
     const CANDLE_GAP = 4;
-    const MAX_CANDLE_WIDTH = 8;
-    const MIN_CANDLE_WIDTH = 6;
+    const MAX_CANDLE_WIDTH = 7;
+    const MIN_CANDLE_WIDTH = 5;
     const availableSpace = CW - (vN - 1) * CANDLE_GAP;
     const CANDLE_WIDTH = Math.max(MIN_CANDLE_WIDTH, Math.min(MAX_CANDLE_WIDTH, availableSpace / vN));
     const TOTAL_CANDLE_WIDTH = CANDLE_WIDTH + CANDLE_GAP;
@@ -436,7 +437,7 @@ const ChartCanvas: React.FC<Props> = ({ candles, livePrice, trades, activeTrade 
   const handleZoomIn = () => {
     setRange(p => {
       const n = p.e - p.s + 1;
-      const nn = Math.max(10, Math.floor(n * 0.7));
+      const nn = Math.max(35, Math.floor(n * 0.7));
       const shrink = n - nn;
       const sOff = Math.floor(shrink * 0.5);
       return {

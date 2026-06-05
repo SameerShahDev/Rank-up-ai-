@@ -160,7 +160,7 @@ const TradingChart: React.FC<TradingChartProps> = ({
     if (candles.length > 0) {
       setVisibleRange((prev) => {
         if (prev.start === 0 && prev.end === 0) {
-          const maxVisible = 80;
+          const maxVisible = 40;
           const end = candles.length - 1;
           const start = Math.max(0, end - maxVisible + 1);
           return { start, end };
@@ -186,7 +186,7 @@ const TradingChart: React.FC<TradingChartProps> = ({
         const count = prev.end - prev.start + 1;
         if (e.ctrlKey || e.metaKey) {
           const zoomDelta = e.deltaY > 0 ? 4 : -4;
-          const newCount = Math.max(15, Math.min(candles.length, count + zoomDelta));
+          const newCount = Math.max(35, Math.min(candles.length, count + zoomDelta));
           return { start: Math.max(0, prev.end - newCount + 1), end: prev.end };
         } else {
           const scrollDelta = e.deltaY > 0 ? 3 : -3;
@@ -295,12 +295,12 @@ const TradingChart: React.FC<TradingChartProps> = ({
     ctx.scale(dpr, dpr);
 
     const PRICE_AXIS_W = 64;
-    const TIME_AXIS_H = 24;
+    const PAD = 40;
     const chartLeft = 0;
     const chartRight = W - PRICE_AXIS_W;
     const chartW = chartRight - chartLeft;
-    const chartTop = 0;
-    const chartBottom = H - TIME_AXIS_H;
+    const chartTop = PAD;
+    const chartBottom = H - PAD;
     const chartH = chartBottom - chartTop;
 
     /* ── Background ──────────────────────────────────────────────── */
@@ -345,7 +345,7 @@ const TradingChart: React.FC<TradingChartProps> = ({
 
     /* ── Scaling ─────────────────────────────────────────────────── */
     const slot = chartW / visibleCount;
-    const barW = Math.max(3, Math.min(16, Math.floor(slot * 0.6)));
+    const barW = Math.max(5, Math.min(7, Math.floor(slot * 0.6)));
     const xFor = (i: number) => chartLeft + (i + 0.5) * slot;
     const toY = (p: number) => chartTop + ((maxP - p) / priceRange) * chartH;
     const px = (v: number) => Math.round(v) + 0.5;
@@ -388,7 +388,7 @@ const TradingChart: React.FC<TradingChartProps> = ({
       ctx.stroke();
       ctx.fillStyle = C.textDim;
       ctx.textAlign = "center";
-      ctx.fillText(fmtTime(visibleOrig[i].time), xFor(i), H - TIME_AXIS_H + 14);
+      ctx.fillText(fmtTime(visibleOrig[i].time), xFor(i), H - 14);
     }
 
     // Separator line for time axis
@@ -731,15 +731,15 @@ const TradingChart: React.FC<TradingChartProps> = ({
       const dateLabel = fmtDate(visibleOrig[ci].time);
       const timeLblW = 76;
       ctx.fillStyle = "rgba(30, 41, 59, 0.95)";
-      ctx.fillRect(candleX - timeLblW / 2, H - TIME_AXIS_H, timeLblW, TIME_AXIS_H);
+      ctx.fillRect(candleX - timeLblW / 2, chartBottom, timeLblW, PAD);
       ctx.strokeStyle = "rgba(255,255,255,0.1)";
       ctx.lineWidth = 1;
-      ctx.strokeRect(candleX - timeLblW / 2, H - TIME_AXIS_H, timeLblW, TIME_AXIS_H);
+      ctx.strokeRect(candleX - timeLblW / 2, chartBottom, timeLblW, PAD);
       ctx.fillStyle = "#fff";
       ctx.font = '9px "SF Mono", ui-monospace, monospace';
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(`${dateLabel} ${timeLabel}`, candleX, H - TIME_AXIS_H + 12);
+      ctx.fillText(`${dateLabel} ${timeLabel}`, candleX, chartBottom + 20);
 
       // Highlight hovered candle outline
       const hcIsUp = hoverCandle.close >= hoverCandle.open;
