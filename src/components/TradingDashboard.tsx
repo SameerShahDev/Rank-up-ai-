@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   ArrowUp, ArrowDown,
-  TrendingUp, TrendingDown, Wallet, ArrowDownToLine,
   Minus, Plus,
 } from "lucide-react";
 import type { AccountMode } from '../types/account';
@@ -102,7 +101,6 @@ const TradingDashboard: React.FC<{
   const [activeTrades, setActiveTrades] = useState<ActiveTrade[]>([]);
   const [price, setPrice] = useState(asset.basePrice);
   const [candles, setCandles] = useState<Candle[]>([]);
-  const [result, setResult] = useState<{ win: boolean; amt: number } | null>(null);
   const priceRef = useRef(price);
   const tradeCountRef = useRef(0);
   const hasHookedRef = useRef(false);
@@ -172,8 +170,6 @@ const TradingDashboard: React.FC<{
         fee: '₹0',
         account: trade.placedInMode,
       });
-      setResult({ win: isWin, amt: isWin ? trade.amount : -trade.amount });
-      setTimeout(() => setResult(null), 3500);
     });
     setActiveTrades(prev => prev.filter(t => t.timeLeft > 0));
   }, [activeTrades, asset, setBalance, addTransaction, accountMode]);
@@ -366,34 +362,6 @@ const TradingDashboard: React.FC<{
         {/* Sentiment Bar */}
         <SentimentBar upPct={sentiment} />
       </div>
-
-
-
-      {/* ── Result Popup ─────────────────────────────────────────── */}
-      {result && (
-        <div className="absolute inset-x-0 top-20 z-[100] flex justify-center pointer-events-none animate-[slideUp_0.3s_ease-out]">
-          <div className="flex items-center gap-3 px-5 py-3 rounded-xl" style={{
-            background: result.win ? 'rgba(38,166,154,0.15)' : 'rgba(239,83,84,0.15)',
-            border: `1px solid ${result.win ? 'rgba(38,166,154,0.5)' : 'rgba(239,83,84,0.5)'}`,
-            boxShadow: result.win ? '0 0 40px rgba(38,166,154,0.3)' : '0 0 40px rgba(239,83,84,0.3)',
-            backdropFilter: 'blur(8px)',
-          }}>
-            {result.win
-              ? <TrendingUp className="w-7 h-7" strokeWidth={2.5} style={{ color: C.up }} />
-              : <TrendingDown className="w-7 h-7" strokeWidth={2.5} style={{ color: C.down }} />}
-            <div>
-              <p className="text-[9px] font-black tracking-widest uppercase" style={{ color: result.win ? C.up : C.down }}>
-                {result.win ? 'PROFIT' : 'LOSS'}
-              </p>
-              <p className="text-2xl font-black tabular-nums" style={{ color: result.win ? C.up : C.down }}>
-                {result.amt >= 0 ? '+' : ''}₹{Math.abs(result.amt).toLocaleString('en-IN')}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-
 
       <style>{`
         @keyframes slideUp {
